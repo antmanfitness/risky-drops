@@ -8,7 +8,7 @@
   const etDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric' });
   const et = (iso) => iso ? etFmt.format(new Date(iso)) + ' ET' : '';
   const LABEL = { in_stock: 'In stock', sold_out: 'Sold out', scheduled: 'Scheduled', paused: 'Paused', blocked: 'Blocked', error: 'Error', unknown: 'Unknown', starting: 'Starting', running: 'Running' };
-  let state = { status: null, alerts: [], flip: null, filter: 'all', tab: 'watches' };
+  let state = { status: null, alerts: [], flip: null, filter: 'all', tab: 'home', wsub: 'list', ssub: 'listings' };
 
   const toast = (t) => { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 2600); };
   // ---- backend: local box server (cookie) or hosted mode (Supabase RPC + access key, commands polled by the box)
@@ -67,18 +67,35 @@
   }
 
   // ---------- tabs
-  function show(tab) {
+  // Tabs: Home / Watches (list | alerts | countdowns) / Phones / Sales (listings | sold | comps). Settings = header gear, Ask = floating orb.
+  const LEGACY = { alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
+  function show(tab, sub) {
+    if (LEGACY[tab]) [tab, sub] = LEGACY[tab];
     state.tab = tab;
     document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'tab-' + tab));
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-    $('#cd-open').classList.toggle('on', tab === 'countdowns');
+    $('#gear').classList.toggle('on', tab === 'settings');
     $('#ask-open').hidden = tab === 'ask';
-    if (typeof closeSheet === 'function') closeSheet();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + tab);
-    if (tab === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
+    if (sub && tab === 'watches') showSub('w', sub);
+    if (sub && tab === 'sales') showSub('s', sub);
+    if (tab === 'phones' || tab === 'home') loadPhones().catch(() => {});
+    if (typeof closeSheet === 'function') closeSheet();
+    if (tab === 'watches' && state.wsub === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+  $('#gear').addEventListener('click', () => show('settings'));
+  const SUBS = { w: ['list', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
+  function showSub(g, v) {
+    if (!SUBS[g].includes(v)) return; state[g + 'sub'] = v;
+    document.querySelectorAll(`#${g}-seg button`).forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+    SUBS[g].forEach((x) => ($(`#${g}-${x}`).hidden = x !== v));
+    if (g === 'w' && v === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (g === 'w' ? 'watches' : 'sales') + '/' + v);
+  }
+  $('#w-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) showSub('w', b.dataset.v); });
+  $('#s-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) showSub('s', b.dataset.v); });
 
   // ---------- watches
   function renderWatches() {
@@ -144,7 +161,7 @@
   function renderBadge() {
     const seen = localStorage.getItem('rd-seen') || '';
     const n = state.alerts.filter((a) => a.kind === 'restock' && !a.backfilled && a.ts > seen).length;
-    $('#badge').textContent = n ? String(n) : '';
+    $('#badge').textContent = n ? String(n) : ''; $('#tab-badge').textContent = n ? String(n) : '';
   }
   function renderAlerts() {
     const list = state.alerts.filter((a) => state.filter === 'all' || a.kind === state.filter);
@@ -160,7 +177,7 @@
         ${a.detail ? `<p class="d">${esc(a.detail)}</p>` : ''}
         <p class="f">${esc(a.time_et || et(a.ts))}${a.backfilled ? ' · from watcher log' : ''}${a.pushed === false ? ' · push failed' : ''}</p>
         ${CFG ? soldLine(a) : ''}
-        <div class="actions">${link ? `<a class="btn buy" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>` : ''}${CFG && a.id && a.kind !== 'test' ? `<button class="btn" data-sold="${esc(a.id)}">${saleFor(a.id) ? 'Edit sale' : 'Mark as sold'}</button>` : ''}</div>
+        <div class="actions">${link ? `<a class="btn buy" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>` : ''}${CFG && a.id && a.kind !== 'test' ? `<button class="btn" data-sold="${esc(a.id)}">${saleFor(a.id) || listingFor(a.id) ? 'Edit sale' : 'Mark as sold'}</button>` : ''}</div>
       </div>`;
     }).join('') || '<p class="empty">No alerts yet.</p>';
   }
@@ -189,14 +206,7 @@
         <p class="f">Source: ${esc(p.source)}${p.fee_hint ? ' · typical fees ' + esc(p.fee_hint) : ''}. ${esc(p.caveat || '')}</p></div>`;
     }).join('');
   }
-  function calc() {
-    const p = parseFloat($('#calc-price').value), r = parseFloat($('#calc-resale').value);
-    if (!isFinite(p)) { $('#calc-out').textContent = 'Enter a price to see cost with NJ tax.'; return; }
-    const cost = p * (1 + TAX);
-    $('#calc-out').innerHTML = `Cost with tax <b>${money(cost)}</b>` + (isFinite(r) ? ` · after ${(fee() * 100).toFixed(1)}% fee you net ${money(r * (1 - fee()))} · profit <b class="${r * (1 - fee()) - cost >= 0 ? '' : ''}">${money(r * (1 - fee()) - cost)}</b>` : '');
-  }
-  $('#fee').addEventListener('input', () => { renderFlip(); calc(); });
-  $('#calc-price').addEventListener('input', calc); $('#calc-resale').addEventListener('input', calc);
+  $('#fee').addEventListener('input', renderFlip);
 
   // ---------- settings
   function applyTheme(t) {
@@ -256,7 +266,7 @@
 
   // ---------- members (picker stored in localStorage)
   const me = () => { const id = +localStorage.getItem('rd-member'); return ext.members.find((m) => m.id === id) || ext.members.find((m) => m.name === 'Krishna') || ext.members[0] || null; };
-  const memberName = (id) => (ext.members.find((m) => m.id === id) || {}).name || 'No owner';
+  const memberName = (id) => (ext.members.find((m) => m.id === id) || {}).name || 'No collector';
   function renderMembers() {
     const cur = me(), sel = $('#member-pick');
     sel.innerHTML = ext.members.map((m) => `<option value="${m.id}" ${cur && m.id === cur.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('') || '<option value="">No members yet</option>';
@@ -306,9 +316,9 @@
   }
 
   // ---------- listings
-  let listingFilter = 'all', listingEdit = null, trackerPeriod = 'all';
+  let listingEdit = null, trackerPeriod = 'all';
   function renderListings() {
-    const rows = ext.listings.filter((l) => listingFilter === 'all' || l.status === listingFilter);
+    const rows = ext.listings.filter((l) => l.status === 'active');
     $('#listing-list').innerHTML = rows.map((l) => {
       const r = pnl(+l.price, +l.fee_pct, +l.shipping, +l.cost);
       return `<div class="card">
@@ -320,8 +330,22 @@
         ${priceLine(priceRow('listing', l.id), +l.cost)}
         <div class="actions"><button class="btn" data-ledit="${l.id}">Edit</button>${l.status === 'active' ? `<button class="btn" data-lsold="${l.id}">Mark sold</button>` : ''}<button class="btn ghost danger" data-ldel="${l.id}">Delete</button></div>
       </div>`;
-    }).join('') || `<p class="empty">${ext.listings.length ? 'Nothing here.' : 'No listings yet. Tap + New listing.'}</p>`;
+    }).join('') || `<p class="empty">${ext.listings.length ? 'No active listings. Sold ones are under Sold.' : 'No listings yet. Tap + New listing.'}</p>`;
+    renderSold();
   }
+  // Sold history: sold listings + alerts marked sold, each shown once (a listing linked to an alert is one record)
+  function renderSold() {
+    const rows = [...ext.listings.filter((l) => l.status === 'sold').map((l) => ({ kind: 'listing', r: l, when: l.sold_at || l.updated_at })),
+      ...ext.sales.map((x) => ({ kind: 'sale', r: x, when: x.sold_at }))].sort((a, b) => String(b.when).localeCompare(String(a.when)));
+    $('#sold-list').innerHTML = rows.map(({ kind, r, when }) => { const m = pnl(+r.price, +r.fee_pct, +r.shipping, +r.cost);
+      return `<div class="card"><div class="row"><p class="t grow">${esc(r.item)}</p><span class="pill sold">${kind === 'sale' || r.alert_id ? 'From alert' : 'Listing'}</span></div>
+        <p class="d">${esc(platName(r))} · fee ${esc(pct(+r.fee_pct))}% · sold ${esc(et(when))}</p>
+        <div class="mgrid"><div><small>Sale</small><b>${money(+r.price)}</b></div><div><small>Fees + ship</small><b>−${money(r2(m.fee + +r.shipping))}</b></div><div class="big"><small>Profit</small><b class="${cls(m.profit)}">${money(m.profit)}</b></div></div>
+        <div class="actions"><button class="btn" data-sedit="${kind}:${kind === 'sale' ? r.alert_id || '' : r.id}">Edit</button></div></div>`; }).join('') || '<p class="empty">No sales yet. Mark a listing sold, or tap “Mark as sold” on an alert.</p>';
+  }
+  $('#sold-list').addEventListener('click', (e) => { const b = e.target.closest('[data-sedit]'); if (!b) return; const [k, id] = b.dataset.sedit.split(':');
+    if (k === 'listing') openListing(ext.listings.find((l) => l.id === +id));
+    else { const s = ext.sales.find((x) => x.alert_id === id); const a = state.alerts.find((x) => x.id === id) || { id, item: s?.item, ts: s?.sold_at }; openSale(a); } });
   function renderTracker() {
     const now = new Date(), today = etKey(now), wd = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7;
     const monday = new Date(Date.parse(today + 'T12:00:00Z') - wd * 86400000).toISOString().slice(0, 10);
@@ -333,7 +357,6 @@
       <div><small>Cost</small><b>${money(r2(t.cost))}</b></div><div><small>Shipping</small><b>${money(r2(t.ship))}</b></div>`;
   }
   $('#tracker-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; trackerPeriod = b.dataset.p; document.querySelectorAll('#tracker-seg button').forEach((x) => x.classList.toggle('on', x === b)); renderTracker(); });
-  $('#listing-filter').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; listingFilter = b.dataset.f; document.querySelectorAll('#listing-filter button').forEach((x) => x.classList.toggle('on', x === b)); renderListings(); });
   const setStatus = (s) => document.querySelectorAll('#sl-status button').forEach((b) => b.classList.toggle('on', b.dataset.s === s));
   const curStatus = () => $('#sl-status button.on').dataset.s;
   $('#sl-status').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { setStatus(b.dataset.s); } });
@@ -386,7 +409,9 @@
   // ---------- mark alert as sold
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const saleFor = (alertId) => ext.sales.find((s) => s.alert_id === alertId);
-  const matchListing = (item) => { const n = norm(item); if (!n) return null; return ext.listings.find((l) => norm(l.item) === n) || ext.listings.find((l) => { const m = norm(l.item); return m.length > 3 && (n.includes(m) || m.includes(n)); }) || null; };
+  const listingFor = (alertId) => ext.listings.find((l) => l.alert_id === alertId);
+  const matchListing = (item) => { const n = norm(item); if (!n) return null; const pool = ext.listings.filter((l) => l.status === 'active' && !l.alert_id);
+    return pool.find((l) => norm(l.item) === n) || pool.find((l) => { const m = norm(l.item); return m.length > 3 && (n.includes(m) || m.includes(n)); }) || null; };
   const lastFee = (platform, custom) => {
     const all = [...ext.listings, ...ext.sales].filter((x) => x.platform === platform && (platform !== 'other' || !custom || norm(x.platform_custom) === norm(custom)));
     all.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))); return all[0] || null;
@@ -401,8 +426,11 @@
       else { f.fee_pct.value = ''; hint.textContent = `No fee saved for ${PLATFORM[plat]} yet. Platforms set individual rates, so enter this sale’s fee %.`; } }
     else { f.fee_pct.value = ''; hint.textContent = 'Pick a platform. Platforms set individual rates, so enter this sale’s fee %.'; }
   }
-  function saleCalc() { const f = $('#sale-form'); $('#ss-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), num(f.cost.value)); }
+  const saleCost = () => { const f = $('#sale-form'); return saleCtx?.listing && f.use_listing.checked ? +saleCtx.listing.cost : num(f.cost.value); };
+  function saleCalc() { const f = $('#sale-form'); $('#ss-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), saleCost()); }
+  const linkToggle = () => { const f = $('#sale-form'), on = !!(saleCtx.listing && f.use_listing.checked); $('#ss-cost-wrap').hidden = on; saleCalc(); };
   function openSale(a) {
+    const linked = listingFor(a.id); if (linked) { openListing(linked); return; }   // already one record: edit the listing itself
     const s = saleFor(a.id), L = s ? null : matchListing(a.item || a.title), f = $('#sale-form'); f.reset();
     saleCtx = { alert: a, sale: s, listing: L, feeTouched: !!s };
     $('#ss-title').textContent = s ? 'Edit sale' : 'Mark as sold'; $('#ss-sub').textContent = `${a.store ? a.store + ' · ' : ''}${a.time_et || et(a.ts)}`;
@@ -410,17 +438,22 @@
     f.platform.value = s ? s.platform : (L ? L.platform : ''); f.platform_custom.value = s ? (s.platform_custom || '') : (L ? (L.platform_custom || '') : '');
     f.cost.value = s ? (+s.cost).toFixed(2) : (L ? (+L.cost).toFixed(2) : ''); f.shipping.value = s && +s.shipping ? (+s.shipping).toFixed(2) : (L && +L.shipping ? (+L.shipping).toFixed(2) : '');
     if (s) { f.fee_pct.value = pct(+s.fee_pct); $('#ss-feehint').textContent = 'Fee % you entered for this sale. Platforms set individual rates.'; } else saleFee(true);
-    $('#ss-delete').hidden = !s; $('#ss-msg').textContent = ''; otherToggle(f); saleCalc(); sheet('#sheet-sale');
+    $('#ss-link-wrap').hidden = !L; if (L) { f.use_listing.checked = true; $('#ss-link-txt').textContent = `Sell my listing “${L.item}” (cost ${money(+L.cost)} stays on that listing)`; }
+    $('#ss-delete').hidden = !s; $('#ss-msg').textContent = ''; otherToggle(f); linkToggle(); sheet('#sheet-sale');
   }
-  $('#sale-form').addEventListener('input', (e) => { if (e.target.name === 'fee_pct') saleCtx.feeTouched = true; if (e.target.name === 'platform_custom') saleFee(); saleCalc(); });
+  $('#sale-form').addEventListener('input', (e) => { if (e.target.name === 'fee_pct') saleCtx.feeTouched = true; if (e.target.name === 'platform_custom') saleFee(); if (e.target.name === 'use_listing') linkToggle(); saleCalc(); });
   $('#sale-form').platform.addEventListener('change', (e) => { otherToggle(e.target.form); saleFee(); saleCalc(); });
   $('#sale-form').addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target, msg = $('#ss-msg'); msg.className = 'msg err';
-    const fee = num(f.fee_pct.value), cost = num(f.cost.value), price = num(f.price.value), ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value);
+    const fee = num(f.fee_pct.value), cost = saleCost(), price = num(f.price.value), ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value);
     const err = !f.item.value.trim() ? 'Enter the item.' : !isFinite(price) || price < 0 ? 'Enter the sale price.' : !f.platform.value ? 'Pick the platform.' : (f.platform.value === 'other' && !f.platform_custom.value.trim()) ? 'Type the platform name for Local / Other.' :
       feeErr(fee) || (!isFinite(cost) || cost < 0 ? 'Enter what you paid (0 or more).' : !isFinite(ship) || ship < 0 ? 'Shipping must be 0 or more.' : '');
     if (err) { msg.textContent = err; return; }
-    try { await call('rd_sale_save', { p_sale: { alert_id: saleCtx.alert.id, item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, price, cost, shipping: ship } });
+    try {
+      const L = saleCtx.listing && f.use_listing.checked ? saleCtx.listing : null;
+      if (L) { await call('rd_listing_update', { p_id: L.id, p_listing: { item: L.item, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, cost: +L.cost, price, shipping: ship, notes: L.notes, status: 'sold' } });
+        await call('rd_listing_link_alert', { p_id: L.id, p_alert_id: saleCtx.alert.id }); }
+      else await call('rd_sale_save', { p_sale: { alert_id: saleCtx.alert.id, item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, price, cost, shipping: ship } });
       closeSheet(); toast('Sale saved'); await refreshExt(); } catch (err2) { msg.textContent = err2.message; }
   });
   $('#ss-delete').addEventListener('click', async () => {
@@ -428,7 +461,7 @@
     try { await call('rd_sale_delete', { p_id: saleCtx.sale.id }); closeSheet(); toast('Sale removed'); await refreshExt(); } catch (err) { $('#ss-msg').textContent = err.message; }
   });
   $('#alert-list').addEventListener('click', (e) => { const b = e.target.closest('button[data-sold]'); if (!b) return; const a = state.alerts.find((x) => x.id === b.dataset.sold); if (a) { try { need(); openSale(a); } catch (err) { toast(err.message); } } });
-  const soldLine = (a) => { const s = a.id && saleFor(a.id); if (!s) return ''; const r = pnl(+s.price, +s.fee_pct, +s.shipping, +s.cost);
+  const soldLine = (a) => { const s = a.id && (saleFor(a.id) || listingFor(a.id)); if (!s) return ''; const r = pnl(+s.price, +s.fee_pct, +s.shipping, +s.cost);
     return `<p class="sold-line">Sold ${money(+s.price)} on ${esc(platName(s))}, profit <span class="${cls(r.profit)}">${money(r.profit)}</span></p>`; };
 
   // ---------- watch items: next drop + check timing + buy-in
@@ -502,9 +535,6 @@
     const n = nextUp();
     $('#cd-hero-txt').innerHTML = n ? `<p class="k">Next up · ${n.kind === 'auto' ? 'Auto' : 'Custom'}</p><p class="h">${esc(n.title)}</p><p class="n" data-tick="${esc(n.at)}" data-past="Now">${compact(new Date(n.at) - Date.now())}</p><p class="w">${esc(etLong(n.at))}</p>`
       : '<p class="k">Countdowns</p><p class="h">Nothing scheduled</p><p class="w">Announced drops and your own reminders show here.</p>';
-    const ent = $('#cd-entry');
-    ent.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>
-      <span class="grow"><span class="t" style="display:block">Countdowns</span><span class="d" style="display:block">${n ? `${esc(n.title)} · <span class="cd-inline" data-tick="${esc(n.at)}" data-past="Now">${compact(new Date(n.at) - Date.now())}</span>` : 'Announced drops and your reminders'}</span></span><span class="chev">›</span>`;
   }
   $('#cd-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; cdView = b.dataset.v; document.querySelectorAll('#cd-seg button').forEach((x) => x.classList.toggle('on', x === b)); $('#cd-trending').hidden = cdView !== 'trending'; $('#cd-mine').hidden = cdView !== 'mine'; });
   $('#cd-who').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; cdWho = b.dataset.w; document.querySelectorAll('#cd-who button').forEach((x) => x.classList.toggle('on', x === b)); renderCountdowns(); });
@@ -530,15 +560,13 @@
   });
   const delCd = async (id) => { try { await call('rd_countdown_delete', { p_id: id }); toast('Removed'); closeSheet(); await refreshExt(); } catch (err) { toast(err.message); } };
   $('#sc-delete').addEventListener('click', () => { if (cdEdit && confirm('Delete this countdown and its reminders?')) delCd(cdEdit.id); });
-  document.querySelector('#tab-countdowns').addEventListener('click', async (e) => {
+  document.querySelector('#w-countdowns').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.cedit) openCd(ext.countdowns.find((c) => c.id === +b.dataset.cedit));
     else if (b.dataset.cdel && confirm('Remove this countdown?')) delCd(+b.dataset.cdel);
     else if (b.dataset.cdrop) { const i = (state.status?.items || []).find((x) => x.id === b.dataset.cdrop); if (i) openDrop(i); }
     else if (b.dataset.cclear && confirm('Clear this drop time?')) { try { await call('rd_drop_set', { p_item_id: b.dataset.cclear, p_at: null }); toast('Cleared'); await refreshExt(); } catch (err) { toast(err.message); } }
   });
-  $('#cd-open').addEventListener('click', () => show('countdowns'));
-  $('#cd-entry').addEventListener('click', () => show('countdowns'));
 
   // ---------- live ticking (1s)
   function tick() {
@@ -550,7 +578,7 @@
     document.querySelectorAll('[data-next]').forEach(nextCheck);
   }
   setInterval(() => { if (document.visibilityState === 'visible') tick(); }, 1000);
-  function renderV2() { if (state.tab === 'ask' && !askBusy) renderAsk(); renderMembers(); renderListings(); renderTracker(); renderCountdowns(); renderWatches(); renderAlerts(); tick(); }
+  function renderV2() { if (state.tab === 'ask' && !askBusy) renderAsk(); renderMembers(); renderDash(); renderListings(); renderTracker(); renderCountdowns(); renderWatches(); renderAlerts(); tick(); }
 
   // ================= Ask Risky (questions queued in Supabase, answered by the box worker with Gemini + Google Search) =================
   let askHist = [], askOpen = null, askBusy = false, askCoords = null;
@@ -656,6 +684,206 @@
   });
   $('#ask-open').addEventListener('click', () => { show('ask'); loadAsk().catch((e) => toast(e.message)); setTimeout(() => $('#ask-q').focus({ preventScroll: true }), 50); });
 
+  // ================= Phones: box scanner, phone log, collectors & payouts, part lookup =================
+  const ph = { phones: [], parts: [], dupes: [], loaded: false, filter: null, q: '' };
+  async function loadPhones() { if (!CFG || !KEY) return; const d = await rpc('rd_phones', { p_key: KEY }); Object.assign(ph, d, { loaded: true }); renderPhones(); renderDash(); }
+  const C = window.RDClassify;
+  const maskSerial = (s) => s ? s.slice(0, 3) + '•••' + s.slice(-2) : '';
+  const phoneName = (p) => [p.model, p.color, p.storage].filter(Boolean).join(' · ') || (p.part_number ? p.part_number : 'Unknown model');
+  const hwMismatch = (p) => p.handwritten_serial && p.serial && p.handwritten_serial.replace(/[^A-Z0-9]/gi, '').toUpperCase() !== p.serial;
+  const partOf = (pn) => ph.parts.find((x) => x.part_number === String(pn || '').toUpperCase());
+  function collectors() {
+    const m = new Map();
+    for (const p of ph.phones) { if (p.status !== 'logged') continue; const k = p.member_id ?? 0; const c = m.get(k) || { id: p.member_id, name: p.member || 'No collector', n: 0, owed: 0 }; c.n++; c.owed = r2(c.owed + +p.price_paid); m.set(k, c); }
+    return [...m.values()].sort((a, b) => b.owed - a.owed);
+  }
+  function renderPhones() {
+    const cs = collectors(), total = r2(cs.reduce((a, c) => a + c.owed, 0));
+    $('#collectors').innerHTML = cs.length ? `<div class="stats" style="margin-top:0"><div class="wide"><small>Owed back to collectors · ${cs.reduce((a, c) => a + c.n, 0)} phones</small><b>${money(total)}</b></div></div>
+      <div class="coll-list">${cs.map((c) => `<button class="coll ${ph.filter === c.id ? 'on' : ''}" data-coll="${c.id ?? ''}"><span class="grow"><b>${esc(c.name)}</b><small>${c.n} phone${c.n === 1 ? '' : 's'}</small></span><b>${money(c.owed)}</b></button>`).join('')}</div>
+      <p class="f">Owed = sum of price paid on each collector’s logged phones (their money back). Profit split comes later.</p>` : '<p class="d">No phones logged yet. Tap Scan box.</p>';
+    $('#ph-filter-clear').hidden = ph.filter === null;
+    const q = ph.q.trim().toUpperCase();
+    const rows = ph.phones.filter((p) => (ph.filter === null || p.member_id === ph.filter) && (!q || [p.serial, p.imei1, p.imei2, p.model, p.color, p.storage, p.part_number, p.member, p.sku].some((x) => String(x || '').toUpperCase().includes(q))));
+    $('#phone-list').innerHTML = rows.map((p) => `<button class="card qrow" data-phone="${p.id}">
+      <div class="row"><p class="t grow">${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
+      <p class="d">S/N ${esc(p.serial)}${p.imei1 ? ' · IMEI ' + esc(p.imei1) : ''}${p.imei2 ? ' / ' + esc(p.imei2) : ''}</p>
+      <p class="f">${esc(p.member || 'No collector')} · ${esc(et(p.created_at))}${p.part_number ? ' · ' + esc(p.part_number) : ''}${p.status === 'returned' ? ' · returned' : ''}${p.has_photo ? ' · 📷' : ''}</p>
+      ${hwMismatch(p) ? `<p class="flag">Handwritten serial “${esc(p.handwritten_serial)}” doesn’t match the scanned serial</p>` : ''}</button>`).join('') || `<p class="empty">${ph.phones.length ? 'No matches.' : 'Nothing logged yet.'}</p>`;
+    $('#parts-count').textContent = ph.parts.length;
+    $('#parts-list').innerHTML = ph.parts.map((x) => `<div class="prow"><span class="grow"><b>${esc(x.part_number)}</b> ${esc([x.model, x.color, x.storage].filter(Boolean).join(' · '))}<br><small>${esc(x.source || '')}</small></span><button class="btn ghost danger" data-pdel="${esc(x.part_number)}" aria-label="Remove ${esc(x.part_number)}">✕</button></div>`).join('');
+    const uniq = (k) => [...new Set([...ph.parts.map((x) => x[k]), ...ph.phones.map((x) => x[k])].filter(Boolean))].sort();
+    $('#dl-model').innerHTML = uniq('model').map((v) => `<option value="${esc(v)}">`).join('');
+    $('#dl-color').innerHTML = uniq('color').map((v) => `<option value="${esc(v)}">`).join('');
+    $('#dl-storage').innerHTML = [...new Set([...uniq('storage'), '128GB', '256GB', '512GB', '1TB', '2TB'])].map((v) => `<option value="${esc(v)}">`).join('');
+  }
+  $('#collectors').addEventListener('click', (e) => { const b = e.target.closest('[data-coll]'); if (!b) return; const id = b.dataset.coll === '' ? null : +b.dataset.coll; ph.filter = ph.filter === id ? null : id; renderPhones(); });
+  $('#ph-filter-clear').addEventListener('click', () => { ph.filter = null; renderPhones(); });
+  $('#ph-search').addEventListener('input', (e) => { ph.q = e.target.value; renderPhones(); });
+  $('#phone-list').addEventListener('click', (e) => { const b = e.target.closest('[data-phone]'); if (b) openPhone(ph.phones.find((p) => p.id === +b.dataset.phone)); });
+  $('#parts-list').addEventListener('click', async (e) => { const b = e.target.closest('[data-pdel]'); if (!b || !confirm(`Remove ${b.dataset.pdel} from the lookup?`)) return;
+    try { await call('rd_part_delete', { p_part: b.dataset.pdel }); await loadPhones(); toast('Removed'); } catch (err) { toast(err.message); } });
+
+  // ---------- scanner UI (guided: serial -> IMEI(s) -> part number, any order)
+  let cap = null, stopLive = null, torchFn = null, torchOn = false;
+  const STEPS = [['serial', 'Serial'], ['imei1', 'IMEI'], ['imei2', 'IMEI 2'], ['part_number', 'Part no.'], ['upc', 'UPC']];
+  function renderCap(last) {
+    $('#scan-check').innerHTML = STEPS.map(([k, l]) => `<span class="${cap[k] ? 'ok' : ''}">${cap[k] ? '✓' : '○'} ${l}${cap[k] ? `<small>${esc(k === 'serial' ? cap[k] : cap[k].slice(-6))}</small>` : ''}</span>`).join('');
+    const next = !cap.serial ? 'Serial No. (S) barcode' : !cap.imei1 ? 'IMEI barcode' : !cap.part_number ? 'Part No. (P) barcode' : null;
+    $('#scan-msg').textContent = next ? `Next: aim the line at the ${next}` : 'Got the essentials. Scan IMEI 2 if there is one, then Review & save.';
+    if (last) $('#scan-last').textContent = last;
+  }
+  function addCode(raw, from) {
+    const c = C.classify(raw); let msg;
+    if (c.type === 'imei') { if (cap.imei1 === c.value || cap.imei2 === c.value) return false; if (!cap.imei1) cap.imei1 = c.value; else if (!cap.imei2) cap.imei2 = c.value; else return false; msg = `IMEI ${c.value}`; }
+    else if (c.type === 'serial') { if (cap.serial === c.value) return false; msg = `${cap.serial ? 'Serial replaced: ' : 'Serial '}${c.value}`; cap.serial = c.value; }
+    else if (c.type === 'part') { if (cap.part_number === c.value) return false; cap.part_number = c.value; const k = partOf(c.value); msg = `Part ${c.value}${k ? ' = ' + [k.model, k.color, k.storage].filter(Boolean).join(' ') : ' (not in lookup yet)'}`; }
+    else if (c.type === 'upc') { if (cap.upc === c.value) return false; cap.upc = c.value; msg = `UPC ${c.value}`; }
+    else { $('#scan-last').textContent = `Ignored ${from || 'code'} “${String(raw).slice(0, 34)}”${c.note ? ': ' + c.note : ''}`; return false; }
+    navigator.vibrate?.(60); renderCap(`✓ ${msg}`); return true;
+  }
+  function openScanner() {
+    try { need(); } catch (err) { toast(err.message); return; }
+    cap = { serial: '', imei1: '', imei2: '', part_number: '', upc: '' }; renderCap(''); $('#scan-last').textContent = '';
+    $('#scan-ui').hidden = false; document.body.style.overflow = 'hidden'; $('#scan-view').hidden = false; $('#scan-torch').hidden = true; torchOn = false;
+    $('#scan-msg').textContent = 'Starting camera…';
+    stopLive = RDScanner.startLive({ video: $('#scan-video'), onCode: (v) => addCode(v, 'barcode'),
+      onTorch: (fn) => { torchFn = fn; $('#scan-torch').hidden = false; },
+      onStatus: (st, m) => { if (st === 'scanning') renderCap(); else { $('#scan-view').hidden = true; $('#scan-msg').textContent = m; } } });
+  }
+  function closeScanner() { stopLive?.(); stopLive = null; torchFn = null; $('#scan-ui').hidden = true; document.body.style.overflow = ''; }
+  $('#scan-open').addEventListener('click', openScanner);
+  $('#scan-cancel').addEventListener('click', () => { if (!Object.values(cap).some(Boolean) || confirm('Discard what you scanned?')) closeScanner(); });
+  $('#scan-torch').addEventListener('click', async () => { if (torchFn && await torchFn(!torchOn)) { torchOn = !torchOn; $('#scan-torch').textContent = torchOn ? 'Light off' : 'Light on'; } else $('#scan-torch').hidden = true; });
+  $('#scan-file').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return; $('#scan-last').textContent = 'Reading barcodes in the photo…';
+    try { const codes = await RDScanner.decodeImage(f); let n = 0; for (const c of codes) if (addCode(c, 'photo code')) n++;
+      $('#scan-last').textContent = codes.length ? `Photo: ${codes.length} code${codes.length === 1 ? '' : 's'} found, ${n} new. ${$('#scan-last').textContent.startsWith('✓') ? '' : ''}` : 'No barcode found in that photo. Try closer and flatter, or use AI read photo.';
+    } catch (err) { $('#scan-last').textContent = err.message; }
+  });
+  $('#scan-ai').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      $('#scan-last').textContent = 'Uploading photo for an AI read (needs the box online)…';
+      const img = await RDScanner.compress(f, 1600, 0.8);
+      const job = await call('rd_scan_submit', { p_member_id: me()?.id ?? null, p_image: img });
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 2500)); const j = await rpc('rd_scan_get', { p_key: KEY, p_id: job.id }).catch(() => null);
+        if (!j) continue; if (j.status === 'pending' && i > 12) $('#scan-last').textContent = 'Waiting for the box to pick this up. Is it online?';
+        if (j.status === 'running') $('#scan-last').textContent = 'Reading the label…';
+        if (j.status === 'error') { $('#scan-last').textContent = j.error; return; }
+        if (j.status === 'done') { const r = j.result || {}; const got = [];
+          if (r.serial && C.classify(r.serial).type !== 'imei') { cap.serial = r.serial.toUpperCase(); got.push('serial'); }
+          (r.imei || []).forEach((x) => { if (!cap.imei1) cap.imei1 = x; else if (!cap.imei2 && x !== cap.imei1) cap.imei2 = x; got.push('IMEI'); });
+          if (r.part_number) { cap.part_number = r.part_number; got.push('part'); } if (r.upc) { cap.upc = r.upc; got.push('UPC'); }
+          cap.ai = { model: r.model, color: r.color, storage: r.storage, notes: r.notes || [] };
+          renderCap(got.length ? `AI read: ${got.join(', ')}. Check every value on the next screen.` : 'AI could not read the label clearly. Type it in.'); return; }
+      }
+      $('#scan-last').textContent = 'No answer yet. The box may be offline.';
+    } catch (err) { $('#scan-last').textContent = err.message; }
+  });
+  $('#scan-type').addEventListener('click', () => { const keep = { ...cap }; closeScanner(); openPhone(null, keep); });
+  $('#scan-done').addEventListener('click', () => { const keep = { ...cap }; closeScanner(); openPhone(null, keep); });
+
+  // ---------- confirm / edit sheet (nothing is saved without this screen)
+  let phEdit = null, phPhoto = null;
+  function partHint() {
+    const f = $('#phone-form'), pn = f.part_number.value.trim().toUpperCase(), k = partOf(pn);
+    if (k) { $('#sp-part').textContent = `Lookup: ${[k.model, k.color, k.storage].filter(Boolean).join(' · ')}`; $('#sp-savepart').hidden = true; }
+    else { $('#sp-part').textContent = pn ? 'Not in the lookup. Pick or type model / color / storage below.' : ''; $('#sp-savepart').hidden = !pn; }
+    return k;
+  }
+  function imeiHint() {
+    const f = $('#phone-form'), bad = ['imei1', 'imei2'].filter((k) => f[k].value.trim() && !C.luhn(f[k].value.replace(/\D/g, '')));
+    $('#sp-imei').innerHTML = bad.length ? `<span class="neg">${bad.map((k) => k === 'imei1' ? 'IMEI' : 'IMEI 2').join(' and ')} failed the IMEI check (15 digits + Luhn).</span>` : '';
+  }
+  function hwHint() {
+    const f = $('#phone-form'), hw = f.handwritten_serial.value.replace(/[^A-Z0-9]/gi, '').toUpperCase(), sn = f.serial.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    $('#sp-hw').hidden = !(hw && sn && hw !== sn); $('#sp-hw').textContent = `Mismatch: handwritten “${hw}” vs scanned “${sn}”. Check the box before saving.`;
+  }
+  const setPhStatus = (v) => document.querySelectorAll('#sp-status button').forEach((b) => b.classList.toggle('on', b.dataset.s === v));
+  $('#sp-status').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setPhStatus(b.dataset.s); });
+  function openPhone(p, scanned) {
+    phEdit = p || null; phPhoto = null; const f = $('#phone-form'); f.reset(); const s = scanned || {};
+    f.member_id.innerHTML = ext.members.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+    f.member_id.value = String(p ? (p.member_id ?? '') : (me()?.id ?? ''));
+    $('#sp-title').textContent = p ? 'Edit phone' : 'Confirm phone'; $('#sp-sub').textContent = p ? `Logged ${et(p.created_at)} by ${p.member || 'no collector'}` : 'Check every field against the box before saving.';
+    for (const k of ['serial', 'imei1', 'imei2', 'part_number', 'model', 'color', 'storage', 'sku', 'handwritten_serial', 'notes']) f[k].value = p ? (p[k] || '') : (s[k] || '');
+    if (!p && s.upc) f.sku.value = 'UPC ' + s.upc;
+    f.price_paid.value = p ? (+p.price_paid).toFixed(2) : '';
+    const k = partHint();
+    if (!p && k) { f.model.value = k.model || ''; f.color.value = k.color || ''; f.storage.value = k.storage || ''; }
+    else if (!p && s.ai) { f.model.value = s.ai.model || ''; f.color.value = s.ai.color || ''; f.storage.value = s.ai.storage || ''; }
+    if (!p && s.ai?.notes?.length) $('#sp-sub').textContent = 'AI read: ' + s.ai.notes.join('; ') + '. Check every value.';
+    $('#sp-thumb').hidden = true; $('#sp-status-wrap').hidden = !p; setPhStatus(p ? p.status : 'logged');
+    if (p?.has_photo) rpc('rd_phone_photo', { p_key: KEY, p_id: p.id }).then((d) => { if (d) { $('#sp-thumb').src = d; $('#sp-thumb').hidden = false; } }).catch(() => {});
+    $('#sp-delete').hidden = !p; $('#sp-rescan').hidden = !!p; $('#sp-msg').textContent = ''; imeiHint(); hwHint(); sheet('#sheet-phone');
+  }
+  $('#phone-form').addEventListener('input', (e) => {
+    const f = e.currentTarget, n = e.target.name;
+    if (n === 'part_number') { const k = partHint(); if (k) { f.model.value = k.model || ''; f.color.value = k.color || ''; f.storage.value = k.storage || ''; } }
+    if (n === 'imei1' || n === 'imei2') imeiHint();
+    if (n === 'serial' || n === 'handwritten_serial') hwHint();
+  });
+  $('#phone-form').photo.addEventListener('change', async (e) => { const fl = e.target.files[0]; if (!fl) return; try { phPhoto = await RDScanner.compress(fl, 1280, 0.72); $('#sp-thumb').src = phPhoto; $('#sp-thumb').hidden = false; } catch (err) { toast(err.message); } });
+  $('#sp-rescan').addEventListener('click', () => { const f = $('#phone-form'); const keep = { serial: f.serial.value, imei1: f.imei1.value, imei2: f.imei2.value, part_number: f.part_number.value, upc: '' };
+    closeSheet(); openScanner(); Object.assign(cap, keep); renderCap('Kept what you had. Scan the rest.'); });
+  $('#phone-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target, msg = $('#sp-msg'); msg.className = 'msg err';
+    const serial = f.serial.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(), i1 = f.imei1.value.replace(/\D/g, ''), i2 = f.imei2.value.replace(/\D/g, ''), price = num(f.price_paid.value);
+    const err = !/^[A-Z0-9]{8,14}$/.test(serial) ? 'Enter the serial number (8–14 letters/numbers).' : (i1 && !C.luhn(i1)) ? 'IMEI fails the IMEI check. Re-scan or fix it.' : (i2 && !C.luhn(i2)) ? 'IMEI 2 fails the IMEI check.' :
+      (i1 && i1 === i2) ? 'IMEI and IMEI 2 are the same.' : (!isFinite(price) || price < 0) ? 'Enter the price paid.' : '';
+    if (err) { msg.textContent = err; return; }
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
+    try {
+      const r = await call('rd_phone_save', { p_id: phEdit ? phEdit.id : null, p_phone: { member_id: f.member_id.value, serial, imei1: i1, imei2: i2, part_number: f.part_number.value, model: f.model.value, color: f.color.value,
+        storage: f.storage.value, sku: f.sku.value, handwritten_serial: f.handwritten_serial.value, price_paid: price, notes: f.notes.value, status: phEdit ? $('#sp-status button.on').dataset.s : 'logged', photo: phPhoto } });
+      if (r && r.error) { msg.className = 'msg err'; msg.textContent = r.error; btn.disabled = false; return; }
+      if (f.save_part.checked && f.part_number.value.trim() && f.model.value.trim() && !partOf(f.part_number.value)) {
+        await call('rd_part_save', { p_part: { part_number: f.part_number.value, model: f.model.value, color: f.color.value, storage: f.storage.value, source: 'added in app by ' + (me()?.name || 'member') } }).catch((x) => toast('Lookup not saved: ' + x.message)); }
+      closeSheet(); toast(phEdit ? 'Phone updated' : 'Phone logged'); await loadPhones();
+    } catch (err2) { msg.className = 'msg err'; msg.textContent = err2.message; }
+    btn.disabled = false;
+  });
+  $('#sp-delete').addEventListener('click', async () => { if (!phEdit || !confirm(`Delete phone ${phEdit.serial}? This can’t be undone.`)) return;
+    try { await call('rd_phone_delete', { p_id: phEdit.id }); closeSheet(); toast('Deleted'); await loadPhones(); } catch (err) { $('#sp-msg').textContent = err.message; } });
+  setInterval(() => { if (document.visibilityState === 'visible' && (state.tab === 'phones' || state.tab === 'home') && !openSheet && $('#scan-ui').hidden) loadPhones().catch(() => {}); }, 10000);
+
+  // ================= Dashboard (read-only overview; every card links to the tab that owns it) =================
+  function renderDash() {
+    if (!$('#dash-stats')) return;
+    const now = new Date(), today = etKey(now), wd = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7, monday = new Date(Date.parse(today + 'T12:00:00Z') - wd * 86400000).toISOString().slice(0, 10);
+    const P = ph.phones, logged = P.filter((p) => p.status === 'logged');
+    const nToday = P.filter((p) => etKey(new Date(p.created_at)) === today).length, nWeek = P.filter((p) => etKey(new Date(p.created_at)) >= monday).length;
+    const cs = collectors(), owed = r2(cs.reduce((a, c) => a + c.owed, 0));
+    const items = state.status?.items || [], alive = items.filter((i) => i.alive).length, blocked = items.filter((i) => i.status === 'blocked').length, hot = items.filter((i) => i.status === 'in_stock').length;
+    const sold = [...ext.listings.filter((l) => l.status === 'sold'), ...ext.sales]; const profit = r2(sold.reduce((a, x) => a + pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost).profit, 0));
+    const n = nextUp();
+    $('#dash-hero').innerHTML = `<p class="k">Risky Drops · ${esc(etDay.format(now))}</p><p class="h">${hot ? `${hot} in stock now` : `${P.length} phone${P.length === 1 ? '' : 's'} logged`}</p>
+      ${n ? `<p class="n" data-tick="${esc(n.at)}" data-past="Now">${compact(new Date(n.at) - Date.now())}</p><p class="w">until ${esc(n.title)} · ${esc(etLong(n.at))}</p>` : '<p class="w">No announced drop yet.</p>'}`;
+    const stat = (go, label, val, sub, c = '') => `<button class="dstat" data-go="${go}"><small>${label}</small><b class="${c}">${val}</b>${sub ? `<span>${sub}</span>` : ''}</button>`;
+    $('#dash-stats').innerHTML = stat('phones', 'Phones logged', P.length, `${nToday} today · ${nWeek} this week`) + stat('phones', 'Owed to collectors', money(owed), `${cs.length} collector${cs.length === 1 ? '' : 's'}`) +
+      stat('watches/list', 'Watchers', `${alive}/${items.length}`, `${blocked} blocked${hot ? ` · <span class="neg">${hot} in stock</span>` : ''}`) + stat('sales/sold', 'Sales profit', money(profit), `${sold.length} sale${sold.length === 1 ? '' : 's'}`, cls(profit));
+    // breakdown by model / color / storage
+    const groups = new Map(); for (const p of logged) { const k = phoneName(p); groups.set(k, (groups.get(k) || 0) + 1); }
+    const breakdown = [...groups.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const flags = [...P.filter(hwMismatch).map((p) => ({ t: `Handwritten serial mismatch on ${maskSerial(p.serial)}`, s: `${p.member || 'No collector'} · ${et(p.created_at)}` })),
+      ...ph.dupes.slice(0, 6).map((d) => ({ t: `Duplicate ${d.kind === 'imei' ? 'IMEI' : 'serial'} attempt ${d.kind === 'imei' ? '…' + d.value.slice(-5) : maskSerial(d.value)}`, s: `${memberName(d.member_id)} · ${et(d.at)}` }))];
+    const restocks = state.alerts.filter((a) => a.kind === 'restock').slice(0, 3);
+    const card = (go, title, body, more = 'Open') => `<div class="card dcard"><div class="row"><p class="t grow">${title}</p><button class="btn ghost" data-go="${go}">${more} ›</button></div>${body}</div>`;
+    $('#dash-cards').innerHTML =
+      card('phones', 'Payout owed by collector', cs.length ? `<div class="coll-list">${cs.slice(0, 5).map((c) => `<button class="coll" data-gocoll="${c.id ?? ''}"><span class="grow"><b>${esc(c.name)}</b><small>${c.n} phone${c.n === 1 ? '' : 's'}</small></span><b>${money(c.owed)}</b></button>`).join('')}</div>` : '<p class="d">No collectors have logged phones yet.</p>') +
+      card('phones', 'Phones by model', breakdown.length ? `<div class="bars">${breakdown.map(([k, v]) => `<div><span>${esc(k)}</span><i style="--w:${Math.round(v / breakdown[0][1] * 100)}%"></i><b>${v}</b></div>`).join('')}</div>` : '<p class="d">Nothing logged yet.</p>') +
+      card('phones', 'Recent phones', P.length ? P.slice(0, 5).map((p) => `<div class="drow"><span class="grow"><b>${esc(phoneName(p))}</b><small>${esc(maskSerial(p.serial))} · ${esc(p.member || 'No collector')} · ${esc(et(p.created_at))}</small></span><b>${money(+p.price_paid)}</b></div>`).join('') : '<p class="d">Nothing logged yet.</p>') +
+      card('phones', `Flags${flags.length ? ` <span class="pill price_drop">${flags.length}</span>` : ''}`, flags.length ? flags.slice(0, 6).map((x) => `<div class="drow flagrow"><span class="grow"><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></div>`).join('') : '<p class="d">No duplicate or mismatch flags.</p>', 'Review') +
+      card('watches/alerts', 'Latest restock alerts', restocks.length ? restocks.map((a) => `<div class="drow"><span class="grow"><b>${esc(a.item || a.title)}</b><small>${esc([a.store, a.city].filter(Boolean).join(', '))} · ${esc(a.time_et || et(a.ts))}</small></span></div>`).join('') : '<p class="d">No restocks yet.</p>') +
+      card('watches/list', 'Watcher health', `<div class="drow"><span class="grow">${items.map((i) => `<span class="hchip"><span class="dot ${i.alive ? 'on' : i.status === 'scheduled' || i.paused ? '' : 'off'}"></span>${esc(i.name.split(' (')[0])}${i.status === 'blocked' ? ' · blocked' : i.status === 'in_stock' ? ' · IN STOCK' : ''}</span>`).join('')}</span></div>`);
+  }
+  $('#tab-home').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-gocoll]'); if (c) { ph.filter = c.dataset.gocoll === '' ? null : +c.dataset.gocoll; show('phones'); renderPhones(); return; }
+    const b = e.target.closest('[data-go]'); if (!b) return; const [t, sub] = b.dataset.go.split('/'); show(t, sub);
+  });
+
   // ---------- data
   async function load() {
     try {
@@ -663,7 +891,7 @@
       state.status = s; state.alerts = a.alerts || [];
       if (!state.flip) state.flip = await api('/api/flip');
       if (!localStorage.getItem('rd-seen')) localStorage.setItem('rd-seen', new Date().toISOString());
-      renderFlip(); renderBadge(); calc(); renderV2();
+      renderFlip(); renderBadge(); renderV2();
     } catch (err) {
       if (/Access key/.test(err.message)) {
         document.querySelector('main').innerHTML = '<div class="card" style="margin-top:30px;text-align:center"><p class="t">Access key required</p><p class="d">Open the full Risky Drops link with ?key=… once. This device remembers it.</p></div>';
@@ -672,7 +900,9 @@
     }
     $('#boot').classList.add('gone');
   }
-  const h = location.hash.slice(1); if (['watches', 'alerts', 'listings', 'countdowns', 'flip', 'settings', 'ask'].includes(h)) { show(h); if (h === 'ask') loadAsk().catch(() => {}); }
+  const route = () => { const [h, hs] = location.hash.slice(1).split('/');
+    if (['home', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
+  route(); window.addEventListener('hashchange', route);
   load();
   setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });

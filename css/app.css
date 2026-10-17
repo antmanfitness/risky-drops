@@ -62,7 +62,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
 /* floating glass bottom tab bar */
 .tabbar { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom));
-  width: min(440px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 6px; border-radius: 26px;
+  width: min(440px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px; border-radius: 26px;
   background: var(--glass); border: 0.5px solid var(--hair); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
   box-shadow: 0 10px 30px rgba(0,0,0,.35); overflow: visible; max-width: calc(100vw - 24px); }
 .tabbar button { min-width: 0; min-height: 52px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; border-radius: 20px;
@@ -218,3 +218,53 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .qrow { width: 100%; text-align: left; cursor: pointer; font: inherit; color: var(--text); display: block; }
 .qrow .t { font-size: 15.5px; }
 @media (prefers-reduced-motion: reduce) { .ask-orb-glow, .ask-input .mic.rec, .ask-orbit .wcs-o .p { animation: none !important; } }
+
+/* ---------- v4: dashboard, phones, scanner ---------- */
+.seg-badge { display: inline-block; min-width: 18px; height: 18px; border-radius: 9px; background: var(--red); color: #fff; font-size: 11px; line-height: 18px; padding: 0 5px; margin-left: 4px; }
+.seg-badge:empty { display: none; }
+.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.dstat { text-align: left; font: inherit; color: var(--text); background: var(--card); border: 0.5px solid var(--hair); border-radius: 16px; padding: 12px 14px; min-height: 84px; cursor: pointer; }
+.dstat small { display: block; color: var(--faint); font-size: 12px; font-weight: 700; }
+.dstat b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.dstat span { color: var(--muted); font-size: 12.5px; }
+.dash-hero .h { font-size: 22px; font-weight: 800; margin: 2px 0; }
+.dash-hero .k { color: var(--muted); font-size: 12.5px; font-weight: 700; margin: 0; }
+.dash-hero .n { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 6px 0 0; }
+.dash-hero .w { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.dcard .row { margin-bottom: 6px; }
+.drow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 0.5px solid var(--hair); }
+.drow small, .coll small, .prow small { display: block; color: var(--faint); font-size: 12px; margin-top: 2px; }
+.drow b { font-variant-numeric: tabular-nums; }
+.flagrow b { color: var(--amber); }
+.hchip { display: inline-flex; align-items: center; gap: 6px; margin: 0 12px 6px 0; font-size: 13px; color: var(--muted); }
+.bars div { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 28px; align-items: center; gap: 8px; padding: 5px 0; font-size: 13.5px; }
+.bars span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bars i { display: block; height: 8px; border-radius: 4px; background: var(--accent); width: var(--w); min-width: 6px; }
+.bars b { text-align: right; font-variant-numeric: tabular-nums; }
+.scan-big { width: 100%; min-height: 64px; font-size: 19px; border-radius: 18px; margin: 4px 0 12px; }
+.scan-big svg { width: 28px; height: 28px; }
+.coll-list { display: grid; gap: 6px; margin-top: 10px; }
+.coll { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; text-align: left; font: inherit; color: var(--text); background: var(--bg-2); border: 0.5px solid var(--hair); border-radius: 12px; padding: 8px 12px; cursor: pointer; }
+.coll.on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.coll > b { font-variant-numeric: tabular-nums; }
+.flag { color: var(--amber); font-size: 13px; font-weight: 600; margin: 6px 0 0; }
+.prow { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 0.5px solid var(--hair); font-size: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 8px; }
+.hint.warn { color: var(--amber); background: rgba(224, 176, 90, .14); border-radius: 10px; padding: 8px 10px; font-weight: 600; }
+.thumb { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; }
+.scan-ui { position: fixed; inset: 0; z-index: 90; background: #000; display: flex; flex-direction: column; }
+.scan-view { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-aim { position: absolute; left: 6%; right: 6%; top: 50%; height: 22%; transform: translateY(-50%); border: 2px solid rgba(255,255,255,.85); border-radius: 14px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.38); }
+.scan-line { position: absolute; left: 4%; right: 4%; top: 50%; height: 2px; background: var(--red); box-shadow: 0 0 8px var(--red); animation: scanpulse 1.4s ease-in-out infinite; }
+@keyframes scanpulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .scan-line { animation: none; } }
+.scan-panel { background: var(--bg); padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--hair); max-height: 62vh; overflow-y: auto; }
+.scan-msg { font-size: 15px; font-weight: 700; margin: 0 0 8px; }
+.scan-check { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.scan-check span { display: inline-flex; flex-direction: column; border-radius: 10px; padding: 5px 10px; background: var(--card-2); color: var(--muted); font-size: 13px; font-weight: 700; }
+.scan-check span.ok { background: rgba(52, 199, 89, .18); color: var(--green); }
+.scan-check small { font-weight: 600; font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums; }
+#scan-last { min-height: 18px; color: var(--muted); font-size: 13px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.scan-panel .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.scan-panel .actions .btn { flex: 1 1 30%; }
