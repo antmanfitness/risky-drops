@@ -1,0 +1,100 @@
+/* v126: iOS Safari date/time inputs have a min intrinsic width and overflow cards. */
+input[type="time"], input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"] {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+  min-height: 44px; text-align: center; border-radius: 12px;
+}
+input[type="time"]::-webkit-date-and-time-value, input[type="date"]::-webkit-date-and-time-value, input[type="datetime-local"]::-webkit-date-and-time-value { text-align: center; min-width: 0; margin: 0; }
+input[type="time"]::-webkit-datetime-edit, input[type="date"]::-webkit-datetime-edit { min-width: 0; }
+.num-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.num-grid > *, .field, label.field { min-width: 0; }
+/* flex rows that hold a date input: let them shrink */
+:is(.row, .split, .train-head, .copy-sheet-days, .ical-client-move) > input[type="date"],
+:is(.row, .split, .train-head, .copy-sheet-days, .ical-client-move) > input[type="time"] { flex: 1 1 140px; width: auto; min-width: 0; }
+html[data-skin="glass"] .train-head input[type=date] { min-width: 0; }
+.copy-sheet-days input[type=date] { min-width: 0; }
+
+/* v126: a real blurred backdrop behind the floating header (WebKit ignores blur under a mask). */
+html[data-skin="glass"] .app-header,
+html[data-skin="glass"][data-theme="light"] .app-header {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 88%, transparent), color-mix(in srgb, var(--bg) 62%, transparent));
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+html[data-skin="glass"] .app-header::after {
+  inset: 100% 0 -16px 0;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  -webkit-mask-image: none; mask-image: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 55%, transparent), transparent);
+}
+/* v127 custom exercises */
+.custom-ex-add { display: block; width: 100%; text-align: left; min-height: 44px; padding: 10px 12px; margin-top: 6px; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb, 47,128,255), .6); background: rgba(var(--accent-rgb, 47,128,255), .08); color: var(--accent, #2f80ff); font-weight: 700; font-size: 15px; cursor: pointer; }
+.custom-ex-form { padding: 12px; border-radius: 14px; background: var(--bg-2, rgba(127,127,127,.08)); margin-top: 8px; }
+.custom-ex-similar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.custom-ex-tag { font-size: 11px; padding: 2px 8px; margin-left: 6px; color: var(--accent, #2f80ff); border-color: rgba(var(--accent-rgb, 47,128,255), .5); vertical-align: middle; }
+/* v128 PR toast: never blocks taps on the page; sits above the workout-complete splash. */
+.pr-toast-wrap { pointer-events: none; z-index: 210; }
+.pr-toast-wrap .pr-card { pointer-events: auto; padding: 16px 44px 14px; touch-action: none; transition: transform .15s ease-out, opacity .15s; }
+.pr-close { position: absolute; top: 0; right: 0; width: 44px; height: 44px; border: 0; background: transparent; color: var(--muted); font-size: 22px; line-height: 44px; cursor: pointer; border-radius: 0 18px 0 12px; }
+.pr-close:focus-visible { outline: 2px solid var(--accent, #2f80ff); }
+@media (prefers-reduced-motion: reduce) { .pr-toast-wrap .pr-card { transition: none; } }
+/* v129 compact program editor */
+.ce-days { display: grid; gap: 8px; margin-top: 10px; }
+.ce-dayrow.card { padding: 0; overflow: hidden; }
+.ce-dayhead { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 10px 14px; background: none; border: 0; color: inherit; text-align: left; font-size: 16px; cursor: pointer; }
+.ce-dayhead b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ce-chev { color: var(--accent, #2f80ff); width: 14px; }
+.ce-daybody { padding: 0 10px 12px; display: grid; gap: 8px; }
+.ce-dayname input, .ce-body input, .ce-body select, .ce-section-name { font-size: 16px; }
+.ce-section-name { width: 100%; box-sizing: border-box; padding: 6px 10px; border-radius: 10px; font-weight: 700; }
+.ce-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ce-row { display: flex; align-items: stretch; border-radius: 12px; background: var(--bg-2, rgba(127,127,127,.08)); border: 1px solid transparent; transition: transform .12s, opacity .12s; }
+.ce-row.dragging { opacity: .55; }
+.ce-row.drop-target { border-color: var(--accent, #2f80ff); }
+.ce-handle { flex: 0 0 34px; min-height: 44px; border: 0; background: none; color: var(--muted); cursor: grab; touch-action: none; font-size: 14px; letter-spacing: -2px; }
+.ce-main { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name meta" "tags tags"; gap: 2px 8px; align-items: center; padding: 8px 10px 8px 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; min-height: 44px; }
+.ce-name { grid-area: name; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.ce-name b { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ce-n, .ce-ss { font-style: normal; flex: 0 0 auto; min-width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 800; background: rgba(127,127,127,.18); color: var(--muted); }
+.ce-ss { background: rgba(var(--accent-rgb, 47,128,255), .18); color: var(--accent, #2f80ff); }
+.ce-meta { grid-area: meta; font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ce-tags { grid-area: tags; display: flex; flex-wrap: wrap; gap: 4px; }
+.ce-tags:empty { display: none; }
+.ce-tag { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: rgba(127,127,127,.16); color: var(--muted); }
+.ce-tags .custom-ex-tag { margin-left: 0; }
+.ce-add { width: 100%; min-height: 44px; margin-top: 6px; border-radius: 12px; border: 1px dashed rgba(var(--accent-rgb, 47,128,255), .55); background: none; color: var(--accent, #2f80ff); font-weight: 700; font-size: 15px; cursor: pointer; }
+.ce-dayactions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ce-sheet .ce-body { display: grid; gap: 10px; }
+.ce-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.ce-grid input { text-align: center; }
+.ce-more summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 4px 0; }
+.ce-more > * + * { margin-top: 8px; }
+.ce-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(127,127,127,.2); }
+.ce-foot .btn { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .ce-row { transition: none; } }
+/* v129: exercise sheet sits above the bottom nav */
+.xs-backdrop:has(.ce-sheet) { z-index: 1000; }
+/* v130: solid themed footer + contrast fixes (light/dark/auto) */
+.ce-foot, html[data-skin] .ce-foot { position: relative; z-index: 2; background: var(--card); border-top: 1px solid var(--line, rgba(127,127,127,.25)); box-shadow: 0 -6px 16px rgba(0,0,0,.12); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.ce-row { background: color-mix(in srgb, var(--text) 5%, var(--card)); border-color: color-mix(in srgb, var(--text) 8%, transparent); }
+.ce-n, .ce-tag { background: color-mix(in srgb, var(--text) 10%, transparent); color: color-mix(in srgb, var(--text) 72%, transparent); }
+.ce-meta, .ce-handle { color: color-mix(in srgb, var(--text) 62%, transparent); }
+/* v131: consistent back button */
+.back-bar { max-width: 560px; margin: 0 auto; padding: 10px 16px 0; box-sizing: border-box; }
+.back-btn { min-height: 44px; min-width: 44px; padding: 0 16px 0 12px; display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent, #2f80ff) 45%, transparent); background: color-mix(in srgb, var(--accent, #2f80ff) 12%, var(--card)); color: var(--accent, #2f80ff); font-size: 15px; font-weight: 700; cursor: pointer; }
+.back-btn:hover { background: color-mix(in srgb, var(--accent, #2f80ff) 20%, var(--card)); }
+.back-btn:focus-visible { outline: 2px solid var(--accent, #2f80ff); outline-offset: 2px; }
+.back-bar + * .screen, .back-bar ~ .screen { padding-top: 12px; }
+@media (min-width: 900px) { .back-bar { max-width: 560px; padding-top: 16px; } .back-btn { font-size: 16px; } }
+.back-bar.in-screen { max-width: none; margin: -10px 0 10px; padding: 0; }
+/* v132: client question + coach link */
+.client-ask-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.55); z-index: 1000; }
+.client-ask { width: min(420px, 100%); display: grid; gap: 12px; text-align: center; padding: 22px 18px; background: var(--card); }
+.client-ask h2 { margin: 0; font-size: 20px; }
+.client-ask-actions { display: grid; gap: 8px; }
+.client-ask-actions .btn { min-height: 48px; font-size: 16px; }
+.link-btn { background: none; border: 0; min-height: 44px; cursor: pointer; font-size: 15px; color: inherit; }
+.code-input { font-size: 24px !important; letter-spacing: .35em; text-align: center; text-transform: uppercase; font-weight: 800; }
+.coach-code { font-size: 30px; font-weight: 900; letter-spacing: .25em; font-variant-numeric: tabular-nums; color: var(--accent, #2f80ff); }
+.simple-onb .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.simple-onb input, .simple-onb select, .simple-onb textarea { font-size: 16px; }

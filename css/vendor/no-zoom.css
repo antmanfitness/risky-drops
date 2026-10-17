@@ -1,0 +1,5 @@
+/* v119: no pinch / double-tap zoom app-wide; 16px inputs so iOS never auto-zooms on focus. */
+html, body { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+a, button, input, select, textarea, label, [role="button"] { touch-action: manipulation; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+select, textarea, [contenteditable="true"] { font-size: max(16px, 1em) !important; }

@@ -1,0 +1,21 @@
+/* Set Orbit brand art (BrandMark): white art on the dark theme, black art on the light theme. */
+.so-brand { display: inline-block; position: relative; line-height: 0; flex-shrink: 0; }
+.so-brand img { display: block; width: 100%; height: auto; -webkit-user-drag: none; user-select: none; }
+.so-brand .so-on-light { display: none; }
+html[data-theme="light"] .so-brand .so-on-dark { display: none; }
+html[data-theme="light"] .so-brand .so-on-light { display: block; }
+
+/* Top-left app header corner (still links to antmanfitness.com). */
+.so-brand.so-header-mark { width: 46px; height: 46px; }
+.so-brand.so-header-mark img { height: 100%; object-fit: contain; }
+
+/* Login screen lockup. */
+.so-brand.so-login-lockup { display: block; width: min(210px, 60vw); margin: 0 auto 10px; }
+
+/* Privacy / Terms public header. */
+.public-brand .so-brand.so-public-mark { width: 40px; height: 40px; }
+.public-brand .so-brand.so-public-mark img { height: 100%; object-fit: contain; border-radius: 0; }
+
+/* Workout-complete splash: the mark replaces the round ANTMAN badge (red glow stays behind it). */
+.wcs-logo .so-brand { position: relative; width: 100%; height: 100%; }
+.wcs-logo .so-brand img { height: 100%; object-fit: contain; border-radius: 0; box-shadow: none; }

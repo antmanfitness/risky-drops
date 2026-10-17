@@ -1,0 +1,21 @@
+/* Risky Drops tokens. Values copied from antman-coaching/src/index.css (dark) and themes/light.css (light). */
+:root, [data-theme="dark"] {
+  --accent: #2f80ff; --accent-rgb: 47, 128, 255; --accent-2: #5c9cff; --accent-dim: rgba(47, 128, 255, 0.2); --accent-btn: #1f6fe8;
+  --bg: #030404; --bg-2: #090b0d; --card: #17191e; --card-2: #20242b;
+  --line: rgba(var(--accent-rgb), 0.34); --line-2: rgba(var(--accent-rgb), 0.58);
+  --text: #f4f1ea; --muted: #8d929b; --faint: #5c616a;
+  --red: #ff4338; --red-2: #ff786e; --red-dim: rgba(255, 67, 56, 0.25);
+  --amber: #e0b05a; --sky: #8ab4ff; --green: #34c759;
+  --glass: rgba(23, 25, 30, 0.62); --hair: rgba(255, 255, 255, 0.10);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --bg: #f6f1e8; --bg-2: #fffaf2; --card: #fffdf8; --card-2: #eee7dc;
+  --line: rgba(31, 92, 200, 0.22); --line-2: rgba(31, 92, 200, 0.42);
+  --text: #1f2022; --muted: #62666d; --faint: #8c8a86;
+  --red: #c93027; --red-2: #9f241e; --red-dim: rgba(201, 48, 39, 0.12);
+  --accent-2: #1f6fe8; --accent-dim: rgba(47, 128, 255, 0.12);
+  --amber: #986b16; --sky: #3e6eb8; --green: #1f8a3c;
+  --glass: rgba(255, 253, 248, 0.72); --hair: rgba(60, 60, 67, 0.14);
+  color-scheme: light;
+}

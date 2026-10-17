@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-skin="glass">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Risky Drops</title>
+<meta name="theme-color" content="#030404">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Risky Drops">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/favicon.png">
+<link rel="manifest" href="./manifest.json">
+<script>(function(){var t=localStorage.getItem('rd-theme')||'dark';var d=t==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=d;})();</script>
+<link rel="stylesheet" href="./css/tokens.css">
+<link rel="stylesheet" href="./css/vendor/brand.css">
+<link rel="stylesheet" href="./css/vendor/orbit.css">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css">
+<link rel="stylesheet" href="./css/vendor/splash.css">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css">
+<link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+<div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
+<svg width="0" height="0" style="position:absolute"><defs><g id="logo"><circle cx="50" cy="50" r="44" fill="none" stroke="#2f80ff" stroke-width="4"/><path d="M50 14 C50 14 26 44 26 60 a24 24 0 0 0 48 0 C74 44 50 14 50 14Z" fill="#fff"/><path d="M53 40 L41 61 H49 L46 76 L60 54 H52 Z" fill="#ff4338"/></g></defs></svg>
+<header class="app-header">
+  <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>
+  <h1>Risky Drops</h1>
+  <small id="updated"></small>
+</header>
+<main>
+  <section class="screen" id="tab-watches">
+    <h2 class="section">Watches</h2>
+    <div class="card summary" id="summary"></div>
+    <div id="watch-list"></div>
+    <div class="kicker">Add an item</div>
+    <form class="card" id="add-form" autocomplete="off">
+      <p class="t">Watch something new</p>
+      <p class="d">Apple part number (e.g. MKFN4LL/A) watches Apple Store pickup every 60s and skips NY stores. Any other product URL gets a light page watcher. Target, Walmart and GameStop block this box, so they're marked Blocked.</p>
+      <label class="field">Product URL or Apple part number<input type="text" name="target" required placeholder="MKFN4LL/A or https://…" autocapitalize="off" spellcheck="false"></label>
+      <label class="field">Name (optional)<input type="text" name="name" placeholder="e.g. AirPods Pro 3"></label>
+      <label class="field">ZIPs<input type="text" name="zips" inputmode="numeric" value="08872" placeholder="08872, 07052, 19103"></label>
+      <label class="field">Sizes (optional, page watcher)<input type="text" name="sizes" placeholder="8, 9.5, 10"></label>
+      <div class="actions"><button class="btn buy" type="submit">Start watching</button></div>
+      <p class="msg" id="add-msg"></p>
+    </form>
+  </section>
+  <section class="screen" id="tab-alerts" hidden>
+    <h2 class="section">Alerts</h2>
+    <div class="seg" id="alert-filter" style="margin-bottom:10px">
+      <button data-f="all" class="on">All</button><button data-f="restock">Restocks</button><button data-f="test">Tests</button>
+    </div>
+    <div id="alert-list"></div>
+  </section>
+  <section class="screen" id="tab-flip" hidden>
+    <h2 class="section">Flip</h2>
+    <div class="card">
+      <p class="t">Assumptions</p>
+      <p class="d">Cost = price + NJ sales tax 6.625%. Profit = resale × (1 − fee) − cost. Blank means the source files have no real number.</p>
+      <label class="field">Selling fee %<input type="number" id="fee" inputmode="decimal" min="0" max="40" step="0.5" value="13"></label>
+    </div>
+    <div id="flip-list"></div>
+    <div class="kicker">Quick calculator</div>
+    <div class="card">
+      <label class="field">Retail price ($)<input type="number" id="calc-price" inputmode="decimal" placeholder="0.00"></label>
+      <label class="field">Expected resale ($)<input type="number" id="calc-resale" inputmode="decimal" placeholder="0.00"></label>
+      <p class="d" id="calc-out" style="margin-top:12px"></p>
+    </div>
+  </section>
+  <section class="screen" id="tab-settings" hidden>
+    <h2 class="section">Settings</h2>
+    <div class="card">
+      <p class="t">Appearance</p>
+      <div class="seg" id="theme-seg" style="margin-top:10px"><button data-t="light">Light</button><button data-t="dark">Dark</button><button data-t="auto">Auto</button></div>
+    </div>
+    <div class="card">
+      <p class="t">Push alerts</p>
+      <p class="d">Alerts go to the ntfy app on your iPhone (topic antman-iphone-80f30bef). Send a test to make sure they come through.</p>
+      <div class="actions"><button class="btn buy" id="test-btn">Send test notification</button></div>
+      <p class="msg" id="test-msg"></p>
+    </div>
+    <div class="card">
+      <p class="t">How it works</p>
+      <p class="d">Watchers run on the Linux box. Status refreshes every 45s; this screen refreshes every 30s. All times are Eastern (ET).</p>
+      <p class="d">Risky Drops only watches and links. It never buys, adds to cart, checks out, or stores payment info. You check out yourself.</p>
+    </div>
+  </section>
+</main>
+<nav class="tabbar" role="tablist">
+  <button data-tab="watches" class="on" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M21 12h-2"/></svg>Watches</button>
+  <button data-tab="alerts" role="tab"><span class="badge" id="badge"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>Alerts</button>
+  <button data-tab="flip" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6 4 4 6-7"/><path d="M15 8h5v5"/></svg>Flip</button>
+  <button data-tab="settings" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+<script src="./js/config.js"></script>
+<script src="./js/orbit.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>

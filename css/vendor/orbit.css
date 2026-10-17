@@ -1,0 +1,76 @@
+/* v113 Set Orbit motif: thin orbit tracks, a traveling planet, a drifting moon. */
+.orbit-ring { position: relative; display: inline-grid; place-items: center; flex: none; --orbit-ease: cubic-bezier(0.32, 0.72, 0, 1); }
+.orbit-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.orbit-track { fill: none; stroke: currentColor; stroke-width: 1; opacity: 0.22; }
+.orbit-inner { fill: none; stroke: currentColor; stroke-width: 0.6; stroke-dasharray: 1.2 3.4; opacity: 0.28; }
+.orbit-arc { fill: none; stroke: var(--orbit-c); stroke-width: 2.4; stroke-linecap: round; transition: stroke-dashoffset 1.1s var(--orbit-ease); }
+.orbit-planet { transform-origin: 50px 50px; transform-box: view-box; transition: transform 1.1s var(--orbit-ease); }
+.orbit-dot { fill: var(--orbit-c); stroke: var(--bg, #000); stroke-width: 1.4; }
+.orbit-halo { fill: var(--orbit-c); opacity: 0.25; }
+.orbit-moon { transform-origin: 50px 50px; transform-box: view-box; animation: orbit-spin 14s linear infinite; }
+.orbit-moon circle { fill: currentColor; opacity: 0.55; }
+.orbit-center { position: relative; display: grid; justify-items: center; line-height: 1.05; text-align: center; }
+.orbit-ring.done .orbit-halo { animation: orbit-pulse 2.4s ease-in-out infinite; }
+@keyframes orbit-spin { to { transform: rotate(360deg); } }
+@keyframes orbit-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.5; } }
+
+/* Today: macro orbits */
+.macro-orbits { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.macro-orbit { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; }
+.macro-orbit .orbit-center b { font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.macro-orbit .orbit-center small { font-size: 10px; color: var(--faint); }
+.macro-orbit > span { font-size: 12px; font-weight: 700; }
+.macro-orbit > small { font-size: 11px; color: var(--faint); white-space: nowrap; }
+.habit-orbit-row { display: flex; align-items: center; gap: 12px; }
+.habit-orbit-row .orbit-center b { font-size: 13px; font-variant-numeric: tabular-nums; }
+.week-orbit-row { display: flex; align-items: center; gap: 14px; }
+.week-orbit-row .orbit-center b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.oura-ring .orbit-center b, .oura-ring-orbit b { font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+/* Story share sheet */
+.story-sheet { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); background: rgba(0, 0, 0, 0.72); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.story-sheet-inner { width: min(380px, 100%); display: grid; gap: 12px; justify-items: center; color: #fff; }
+.story-sheet img { width: auto; max-width: 100%; max-height: min(62vh, 560px); aspect-ratio: 9 / 16; border-radius: 18px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); border: 0.5px solid rgba(255, 255, 255, 0.16); background: #05070d; }
+.story-sheet-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.story-sheet-actions .wide { grid-column: 1 / -1; }
+.story-sheet-note { font-size: 13px; color: rgba(235, 235, 245, 0.7); margin: 0; text-align: center; min-height: 16px; }
+.story-sheet .wcs-btn { min-height: 48px; border: 0; border-radius: 999px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; background: rgba(118, 118, 128, 0.32); color: #fff; }
+.story-sheet .wcs-btn.primary { background: var(--accent-btn, #1f6fe8); }
+.story-sheet-loading { width: 220px; aspect-ratio: 9 / 16; border-radius: 18px; display: grid; place-items: center; background: #05070d; color: rgba(255,255,255,.7); }
+.recap-card { display: flex; align-items: center; gap: 14px; }
+.recap-card .grow { flex: 1; min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit-arc, .orbit-planet { transition: none; }
+  .orbit-moon, .orbit-ring.done .orbit-halo { animation: none; }
+}
+.oura-today-score .orbit-ring b { font-size: 18px; color: var(--ring); }
+.wearables-today:has(> .card + .card) .oura-today-score .orbit-ring { width: 46px !important; height: 46px !important; }
+.wearables-today:has(> .card + .card) .oura-today-score .orbit-ring b { font-size: 14px; }
+.oura-today-score { border-top: 0 !important; }
+
+/* v114 Today → Morning Weigh-in */
+.weighin-card { display: flex; align-items: center; gap: 14px; }
+.weighin-main { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.weighin-head { display: grid; gap: 1px; }
+.weighin-head .faint { font-size: 12px; }
+.weighin-glyph { font-size: 13px; font-weight: 700; color: var(--accent); }
+.weighin-row { display: flex; gap: 8px; align-items: center; }
+.weighin-input { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+.weighin-input.bf { flex: 0 0 76px; }
+.weighin-input input { width: 100%; min-height: 40px; padding: 8px 30px 8px 12px; border-radius: 12px; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.weighin-input span { position: absolute; right: 10px; font-size: 13px; color: var(--faint); pointer-events: none; }
+.weighin-row .btn { min-height: 40px; flex: none; }
+.weighin-foot { display: flex; gap: 10px; align-items: center; min-height: 16px; font-size: 12px; }
+.weighin-foot:empty { display: none; }
+.weighin-bf-toggle { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.weighin-foot .status-line, .weighin-foot .error { margin: 0; font-size: 12px; }
+
+/* v114 minimizable check-in form */
+.ci-min { padding: 0; }
+.ci-min-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; background: none; border: 0; color: var(--text); font: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.ci-min-toggle .ci-chev, .ci-min-btn .ci-chev { display: inline-block; font-size: 22px; line-height: 1; color: var(--accent); transition: transform .2s ease; }
+.ci-min-toggle .ci-chev { transform: rotate(90deg); }
+.ci-min-btn { width: 32px; height: 32px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--card-2); cursor: pointer; }
+.ci-min-btn .ci-chev { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { .ci-min-toggle .ci-chev, .ci-min-btn .ci-chev { transition: none; } }

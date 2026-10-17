@@ -1,0 +1,100 @@
+/* v107 iOS polish: grouped lists, one type scale, small text actions, one red accent.
+   Scoped to .ios-screen (Progress, Food, Habits, Notifications) + the shared sheets. Visual only. */
+.ios-screen { --lime: var(--accent); --lime-dim: var(--accent-dim); --gap: 12px; }
+.ios-screen .card-title { letter-spacing: -0.02em; }
+.ios-screen h1.card-title { font-size: 32px; line-height: 1.1; margin: 4px 0 6px; }
+.ios-screen .section-head { margin: 22px 4px 6px; }
+.ios-screen .section-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+.ios-screen .card { border-radius: 14px; padding: 14px 16px; }
+.ios-screen .kicker { font-size: 12px; letter-spacing: .02em; text-transform: none; color: var(--muted); }
+/* Lime buttons become the single red accent. */
+.ios-screen .btn-lime { background: var(--accent-btn); color: #fff; box-shadow: none; }
+.ios-screen .btn { border-radius: 12px; font-weight: 700; }
+/* Small text actions instead of pill buttons. */
+.ios-screen .btn-tiny.btn-ghost, .ios-screen .hb-btn:not(.solid), .ios-screen .icon-btn { background: none; border: 0; box-shadow: none; padding: 4px 2px; color: var(--accent); font-weight: 600; }
+.ios-screen .hb-btn.solid { background: none; color: var(--accent); border: 0; box-shadow: none; padding: 4px 2px; font-weight: 600; }
+.ios-screen .btn-tiny.danger, .ios-screen .icon-btn.danger { color: var(--red); }
+.ios-screen .habit-summary-today-link a { color: var(--accent); font-weight: 600; text-decoration: none; }
+/* Segmented controls (iOS style) */
+.ios-screen .progress-tabs.chips { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: rgba(118,118,128,.24); width: 100%; }
+.ios-screen .progress-tabs.chips .chip { flex: 1; text-align: center; border: 0; border-radius: 7px; background: transparent; color: var(--text); font-size: 13px; font-weight: 600; padding: 6px 4px; }
+.ios-screen .progress-tabs.chips .chip.on { background: var(--card-2); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+/* Progress: title row with Oura chip */
+.progress-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.oura-sync-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; background: var(--card); border: 1px solid var(--line); color: var(--text); }
+.oura-sync-dot { color: var(--accent); }
+.progress-checkin { gap: 14px; }
+.progress-checkin .weigh-in-fields { grid-template-columns: 1fr 1fr; }
+.progress-checkin .weigh-in-fields > :first-child { grid-column: 1 / -1; }
+.pc-measure { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }
+.pc-measure summary { cursor: pointer; list-style: none; padding: 4px 0; }
+.pc-measure summary::-webkit-details-marker { display: none; }
+.pc-measure summary::after { content: '›'; float: right; color: var(--muted); transition: transform .15s; }
+.pc-measure[open] summary::after { transform: rotate(90deg); }
+.pc-measure .measure-grid { margin-top: 10px; }
+.pc-media { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; display: grid; gap: 10px; }
+.pc-media .progress-tabs.chips { width: auto; min-width: 160px; }
+.pose-slot { position: relative; }
+.pose-slot-pick { display: grid; gap: 2px; cursor: pointer; }
+.pc-next { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }
+.pc-next p { margin: 4px 0 0; }
+/* History feed as one inset grouped list */
+.feed-trends { display: flex; flex-wrap: wrap; gap: 6px; }
+.feed-trends .chip { font-size: 12px; padding: 4px 10px; }
+.feed-list { background: var(--card); border-radius: 14px; overflow: hidden; gap: 0 !important; }
+.feed-list > * + * { border-top: 1px solid rgba(255,255,255,.07); }
+.feed-list .ch-row, .feed-list .feed-row { width: 100%; background: transparent; border: 0; border-radius: 0; margin: 0; color: inherit; text-align: left; font: inherit; }
+.feed-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.feed-chips .chip { font-size: 11px; padding: 1px 7px; }
+.feed-chips .down { color: #34c759; } .feed-chips .up { color: var(--muted); }
+.feed-thumbs { display: flex; gap: 4px; margin-top: 6px; }
+.feed-thumbs img { width: 38px; height: 50px; object-fit: cover; border-radius: 6px; }
+.feed-detail { margin: 0 12px 12px; background: var(--card-2); }
+.feed-day .ch-mid { min-width: 0; }
+:root[data-theme='light'] .feed-list > * + *, :root[data-theme='light'] .pc-measure, :root[data-theme='light'] .pc-media, :root[data-theme='light'] .pc-next { border-color: rgba(0,0,0,.08); }
+
+/* Shared sheets: one radius, grabber, padding */
+.xs-sheet, .hb-sheet { border-radius: 14px 14px 0 0; }
+.xs-sheet::before, .hb-sheet::before { content: ''; display: block; width: 36px; height: 5px; border-radius: 3px; background: rgba(128,128,128,.45); margin: -4px auto 10px; }
+
+/* Food add sheet: search focus ring uses the red accent too. */
+.food-search-bar:focus-within, .xs-sheet .food-search-bar:focus-within { border-color: var(--accent); }
+
+/* v108 — compact "Check-in sent" card + quick log */
+.ci-sent { display:flex; align-items:center; gap:14px; animation: ci-collapse .38s cubic-bezier(.2,.8,.2,1) both; }
+.ci-sent-check { flex:none; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; background:rgba(52,199,89,.16); color:#34c759; font-weight:800; font-size:20px; }
+.ci-sent-body { flex:1; min-width:0; }
+.ci-sent-title { margin:0; font-size:17px; font-weight:700; }
+.ci-sent-sub { margin:2px 0 0; font-size:14px; }
+.ci-sent-next { margin:4px 0 0; font-size:13px; }
+.ci-sent-links { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:none; }
+.ci-sent-links a, .ci-link { font-size:14px; font-weight:600; color:var(--accent, #0a84ff); background:none; border:0; padding:4px 0; cursor:pointer; text-decoration:none; }
+.ci-quick { padding-top:4px; padding-bottom:4px; }
+.ci-quick-toggle { width:100%; display:flex; justify-content:space-between; align-items:center; background:none; border:0; color:inherit; font:inherit; font-weight:600; padding:12px 0; cursor:pointer; }
+.ci-chev { transition: transform .25s ease; opacity:.6; font-size:18px; }
+.ci-quick.open .ci-chev { transform: rotate(90deg); }
+.ci-quick-wrap { display:grid; grid-template-rows:0fr; transition: grid-template-rows .3s ease; }
+.ci-quick.open .ci-quick-wrap { grid-template-rows:1fr; }
+.ci-quick-inner { overflow:hidden; min-height:0; }
+.ci-quick.open .ci-quick-inner { padding-bottom:12px; }
+.ci-quick .weigh-in-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
+.ci-quick .weigh-in-fields > :first-child { grid-column: 1 / -1; }
+.ci-quick-photos { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.ci-quick-thumb { position:relative; width:48px; height:48px; border-radius:10px; overflow:hidden; }
+.ci-quick-thumb img { width:100%; height:100%; object-fit:cover; }
+.ci-quick-thumb button { position:absolute; top:0; right:0; border:0; background:rgba(0,0,0,.55); color:#fff; width:18px; height:18px; line-height:18px; padding:0; font-size:12px; }
+.progress-checkin.ci-expanding { animation: ci-expand .32s ease both; }
+@keyframes ci-collapse { from { opacity:0; transform: scaleY(.85) translateY(-8px); } to { opacity:1; transform:none; } }
+@keyframes ci-expand { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .ci-sent, .progress-checkin.ci-expanding { animation:none; } .ci-quick-wrap, .ci-chev { transition:none; } }
+
+/* v108 — iOS date input overflow: clamp every control in the check-in cards */
+.progress-checkin, .ci-quick { min-width:0; max-width:100%; box-sizing:border-box; }
+.progress-checkin .field, .ci-quick .field { min-width:0; max-width:100%; }
+.progress-checkin input:not(.visually-hidden-file), .progress-checkin select, .progress-checkin textarea,
+.ci-quick input:not(.visually-hidden-file) { width:100%; min-width:0 !important; max-width:100%; box-sizing:border-box; }
+.progress-checkin input[type="date"], .ci-quick input[type="date"] { -webkit-appearance:none; appearance:none; display:block; min-height:44px; text-align:left; }
+.progress-checkin input[type="date"]::-webkit-date-and-time-value, .ci-quick input[type="date"]::-webkit-date-and-time-value { text-align:left; min-width:0; }
+.ci-quick-photos label { position:relative; overflow:hidden; }
+.ci-quick:not(.open) .ci-quick-inner { visibility:hidden; }
