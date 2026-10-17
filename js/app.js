@@ -72,6 +72,7 @@
     document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'tab-' + tab));
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     $('#cd-open').classList.toggle('on', tab === 'countdowns');
+    $('#ask-open').hidden = tab === 'ask';
     if (typeof closeSheet === 'function') closeSheet();
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + tab);
     if (tab === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
@@ -549,7 +550,111 @@
     document.querySelectorAll('[data-next]').forEach(nextCheck);
   }
   setInterval(() => { if (document.visibilityState === 'visible') tick(); }, 1000);
-  function renderV2() { renderMembers(); renderListings(); renderTracker(); renderCountdowns(); renderWatches(); renderAlerts(); tick(); }
+  function renderV2() { if (state.tab === 'ask' && !askBusy) renderAsk(); renderMembers(); renderListings(); renderTracker(); renderCountdowns(); renderWatches(); renderAlerts(); tick(); }
+
+  // ================= Ask Risky (questions queued in Supabase, answered by the box worker with Gemini + Google Search) =================
+  let askHist = [], askOpen = null, askBusy = false, askCoords = null;
+  // tiny safe markdown: escape everything first, then allow headings, bold/italic, lists, tables, code, http(s) links
+  function md(src) {
+    const inline = (s) => esc(s)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, u) => `<a href="${u.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer">${t}</a>`)
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (m, pre, u) => `${pre}<a href="${u.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer">${u.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>`)
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>');
+    const lines = String(src || '').replace(/\r/g, '').split('\n'); let out = '', list = null, para = [];
+    const flushP = () => { if (para.length) { out += `<p>${para.map(inline).join('<br>')}</p>`; para = []; } };
+    const flushL = () => { if (list) { out += `</${list}>`; list = null; } };
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i], t = l.trim(); let m;
+      if (!t) { flushP(); flushL(); continue; }
+      if ((m = /^#{1,6}\s+(.*)$/.exec(t))) { flushP(); flushL(); out += `<h3>${inline(m[1])}</h3>`; continue; }
+      if (/^\|.*\|$/.test(t) && i + 1 < lines.length && /^\|?\s*:?-{2,}/.test(lines[i + 1].trim())) {
+        flushP(); flushL(); const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+        let tb = `<table><tr>${cells(t).map((c) => `<th>${inline(c)}</th>`).join('')}</tr>`; i += 2;
+        while (i < lines.length && /^\|.*\|$/.test(lines[i].trim())) { tb += `<tr>${cells(lines[i]).map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`; i++; }
+        out += tb + '</table>'; i--; continue;
+      }
+      if ((m = /^[-*•]\s+(.*)$/.exec(t))) { flushP(); if (list !== 'ul') { flushL(); out += '<ul>'; list = 'ul'; } out += `<li>${inline(m[1])}</li>`; continue; }
+      if ((m = /^\d+[.)]\s+(.*)$/.exec(t))) { flushP(); if (list !== 'ol') { flushL(); out += '<ol>'; list = 'ol'; } out += `<li>${inline(m[1])}</li>`; continue; }
+      flushL(); para.push(t);
+    }
+    flushP(); flushL(); return out;
+  }
+  const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  function answerCard(q) {
+    if (!q) return '';
+    const head = `<div class="row"><p class="t grow">${esc(q.question)}</p></div><p class="f">${esc(q.member || '')}${q.location ? ' · ' + esc(q.location) : ''} · ${esc(et(q.created_at))}${q.model ? ' · ' + esc(q.model) : ''}</p>`;
+    if (q.status === 'pending' || q.status === 'running') {
+      const old = Date.now() - new Date(q.created_at) > 45000;
+      return `<div class="card">${head}<div class="ask-loading" style="margin-top:12px"><div class="ask-orbit busy">${$('#ask-orbit').innerHTML}</div>
+        <p class="d">${q.status === 'pending' ? (old ? 'Waiting for the box to pick this up. Is it online?' : 'Sending to Risky…') : 'Researching live sources…'}</p></div></div>`;
+    }
+    if (q.status === 'error') return `<div class="card">${head}<p class="msg err">${esc(q.error || 'Something went wrong. Try again.')}</p><div class="actions"><button class="btn" data-qretry="${q.id}">Ask again</button><button class="btn ghost danger" data-qdel="${q.id}">Delete</button></div></div>`;
+    const src = (q.sources || []).filter((s) => safeUrl(s.url));
+    const rendered = q.search && q.search.rendered ? `<iframe class="gsearch" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Google Search suggestions" srcdoc="${esc('<base target="_blank">' + q.search.rendered)}"></iframe>` : '';
+    return `<div class="card">${head}<div class="md" style="margin-top:10px">${md(q.answer)}</div>
+      ${src.length ? `<div class="sources">${src.map((s, i) => `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer"><b>${i + 1}</b><span>${esc(s.title || host(s.url))}</span></a>`).join('')}</div>` : '<p class="f">No web sources were returned for this answer.</p>'}
+      ${rendered}${q.notified ? `<p class="f">Phone summary: ${esc(q.notified)}</p>` : ''}
+      <div class="actions"><button class="btn ghost danger" data-qdel="${q.id}">Delete</button></div></div>`;
+  }
+  function renderAsk() {
+    const m = me(); $('#ask-who').textContent = m ? `Asking as ${m.name}` : 'Pick who you are in Settings';
+    $('#ask-answer').innerHTML = askOpen ? answerCard(askHist.find((q) => q.id === askOpen) || null) : '';
+    $('#ask-history').innerHTML = askHist.filter((q) => q.id !== askOpen).map((q) => `<button class="card qrow" data-qopen="${q.id}"><p class="t">${esc(q.question)}</p>
+      <p class="f">${esc(q.member || '')} · ${esc(et(q.created_at))} · ${q.status === 'done' ? `${(q.sources || []).length} sources` : q.status === 'error' ? '<span class="neg">failed</span>' : 'answering…'}</p></button>`).join('') || '<p class="empty">No questions yet.</p>';
+    $('#ask-orbit').classList.toggle('busy', askBusy);
+  }
+  async function loadAsk() { if (!CFG || !KEY) return; askHist = await rpc('rd_questions', { p_key: KEY }); renderAsk(); }
+  async function waitAnswer(id) {
+    askBusy = true; renderAsk();
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, i < 5 ? 1500 : 2500));
+      const q = await rpc('rd_question_get', { p_key: KEY, p_id: id }).catch(() => null);
+      if (q) { const k = askHist.findIndex((x) => x.id === id); if (k >= 0) askHist[k] = q; else askHist.unshift(q); renderAsk(); if (q.status === 'done' || q.status === 'error') break; }
+    }
+    askBusy = false; renderAsk();
+  }
+  async function ask(text) {
+    if (askBusy) return; const msg = text.trim(); if (!msg) { toast('Type a question first'); return; }
+    let loc = '';
+    if ($('#ask-loc').checked) { if (!askCoords) await getLoc(); if (askCoords) loc = askCoords; }
+    try { need(); const q = await rpc('rd_ask', { p_key: KEY, p_member_id: me()?.id ?? null, p_question: msg, p_location: loc, p_notify: $('#ask-notify').checked });
+      askHist.unshift(q); askOpen = q.id; $('#ask-q').value = ''; $('#ask-count').textContent = '0'; window.scrollTo(0, 0); await waitAnswer(q.id);
+    } catch (err) { toast(err.message); }
+  }
+  function getLoc() {
+    return new Promise((res) => {
+      if (!navigator.geolocation) { $('#ask-loc-txt').textContent = 'not supported'; return res(); }
+      $('#ask-loc-txt').textContent = 'locating…';
+      navigator.geolocation.getCurrentPosition((p) => { askCoords = `near ${p.coords.latitude.toFixed(3)}, ${p.coords.longitude.toFixed(3)} (±${Math.round(p.coords.accuracy)} m)`; $('#ask-loc-txt').textContent = askCoords; res(); },
+        () => { $('#ask-loc-txt').textContent = 'location blocked; using Sayreville NJ'; $('#ask-loc').checked = false; res(); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+    });
+  }
+  $('#ask-loc').addEventListener('change', (e) => { if (e.target.checked && !askCoords) getLoc(); });
+  $('#ask-q').addEventListener('input', (e) => ($('#ask-count').textContent = e.target.value.length));
+  $('#ask-form').addEventListener('submit', (e) => { e.preventDefault(); ask($('#ask-q').value); });
+  $('#ask-chips').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const t = $('#ask-q'); t.value = b.dataset.q; t.focus(); const i = t.value.indexOf('['); if (i >= 0) t.setSelectionRange(i, t.value.indexOf(']', i) + 1); $('#ask-count').textContent = t.value.length; });
+  document.querySelector('#tab-ask').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-qopen],[data-qdel],[data-qretry]'); if (!b) return;
+    if (b.dataset.qopen) { askOpen = +b.dataset.qopen; renderAsk(); window.scrollTo(0, 0); }
+    else if (b.dataset.qretry) { const q = askHist.find((x) => x.id === +b.dataset.qretry); if (q) { $('#ask-q').value = q.question; ask(q.question); } }
+    else if (b.dataset.qdel && confirm('Delete this question and answer?')) {
+      try { await rpc('rd_question_delete', { p_key: KEY, p_id: +b.dataset.qdel }); askHist = askHist.filter((x) => x.id !== +b.dataset.qdel); if (askOpen === +b.dataset.qdel) askOpen = null; renderAsk(); toast('Deleted'); } catch (err) { toast(err.message); }
+    }
+  });
+  // dictation (Web Speech API where available; iOS Safari users can use the keyboard mic)
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; let rec = null;
+  if (!SR) { $('#ask-mic').hidden = true; $('#ask-mic-hint').textContent = 'Tip: use your keyboard’s dictation mic to speak your question.'; }
+  $('#ask-mic').addEventListener('click', () => {
+    if (rec) { rec.stop(); return; }
+    rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = false;
+    const base = $('#ask-q').value ? $('#ask-q').value.trim() + ' ' : '';
+    rec.onresult = (ev) => { let t = ''; for (const r of ev.results) t += r[0].transcript; $('#ask-q').value = (base + t).slice(0, 1000); $('#ask-count').textContent = $('#ask-q').value.length; };
+    rec.onerror = (ev) => toast(ev.error === 'not-allowed' ? 'Microphone blocked. Use the keyboard mic instead.' : 'Dictation stopped: ' + ev.error);
+    rec.onend = () => { rec = null; $('#ask-mic').classList.remove('rec'); };
+    try { rec.start(); $('#ask-mic').classList.add('rec'); } catch (e) { rec = null; }
+  });
+  $('#ask-open').addEventListener('click', () => { show('ask'); loadAsk().catch((e) => toast(e.message)); setTimeout(() => $('#ask-q').focus({ preventScroll: true }), 50); });
 
   // ---------- data
   async function load() {
@@ -567,7 +672,7 @@
     }
     $('#boot').classList.add('gone');
   }
-  const h = location.hash.slice(1); if (['watches', 'alerts', 'listings', 'countdowns', 'flip', 'settings'].includes(h)) show(h);
+  const h = location.hash.slice(1); if (['watches', 'alerts', 'listings', 'countdowns', 'flip', 'settings', 'ask'].includes(h)) { show(h); if (h === 'ask') loadAsk().catch(() => {}); }
   load();
   setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
