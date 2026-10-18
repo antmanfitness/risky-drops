@@ -447,3 +447,19 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .fav-card .t { margin: 0; }
 .fav-note { font-style: italic; }
 .card.slim { padding: 10px 12px; }
+/* v5.3 fee calculator + quantity */
+.fc details.fc-more { margin: 4px 0 6px; border-top: 0.5px solid var(--hair); padding-top: 8px; }
+.fc details.fc-more summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--accent); cursor: pointer; }
+.fc .grid2 .field, #listing-form .grid2 .field, #usale-form .grid2 .field { display: flex; flex-direction: column; justify-content: flex-end; }
+.fc-out { margin-top: 10px; }
+.fc-hero { border-radius: 14px; padding: 12px 14px; background: var(--bg-2); border: 0.5px solid var(--hair); }
+.fc-hero small { display: block; font-size: 12px; font-weight: 700; color: var(--faint); }
+.fc-hero b { display: block; font-size: 30px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.fc-hero span { font-size: 13px; color: var(--faint); font-weight: 600; }
+.fc-hero.pos b { color: var(--green); } .fc-hero.neg b { color: var(--red); }
+.fc-hero.pos { border-color: color-mix(in srgb, var(--green) 45%, transparent); } .fc-hero.neg { border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+.fc-grid .wide { grid-column: 1 / -1; }
+@media (max-width: 420px) { .fc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.qpill { white-space: nowrap; }
+.sold-line { font-size: 13.5px; font-weight: 600; margin: 8px 0 0; color: var(--faint); }
+#su-chips { margin: -2px 0 8px; }

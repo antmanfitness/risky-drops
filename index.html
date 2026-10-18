@@ -227,6 +227,47 @@
       <p class="d" id="acct-who"></p>
       <div class="actions"><a class="btn" href="#friends">Friends &amp; logins</a><button class="btn" type="button" id="acct-logout">Log out</button></div>
     </div>
+    <div class="card fc" id="calc-card">
+      <div class="row"><p class="t grow">Fee &amp; profit calculator</p><button type="button" class="linkbtn" id="fc-reset">Clear</button></div>
+      <p class="d">Pick where you’re selling; fees fill in from that platform and stay editable. Updates as you type.</p>
+      <form id="fc-form" autocomplete="off" novalidate onsubmit="return false">
+        <label class="field">Item (optional)<input type="text" name="item" maxlength="120" placeholder="e.g. PS5 Pro 2TB"></label>
+        <label class="field">Platform<select name="platform" id="fc-platform"></select></label>
+        <label class="field" id="fc-cat-wrap" hidden>eBay category<select name="ebay_cat"><option value="general">Most categories</option><option value="sneakers">Sneakers (men’s / women’s athletic shoes)</option></select></label>
+        <div class="grid2">
+          <label class="field">Sale price ($ each)<input type="text" name="price" inputmode="decimal" placeholder="0.00"></label>
+          <label class="field">Quantity<input type="text" name="qty" inputmode="numeric" placeholder="1"></label>
+        </div>
+        <div class="grid2">
+          <label class="field">Item cost ($ each)<input type="text" name="cost" inputmode="decimal" placeholder="what you paid"></label>
+          <label class="field">Sales tax you paid (%)<input type="text" name="tax" inputmode="decimal" placeholder="6.625"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="tax_on" checked> I paid sales tax on it (NJ 6.625% default)</label>
+        <div class="grid2">
+          <label class="field">Your shipping ($)<input type="text" name="ship" inputmode="decimal" placeholder="0.00"></label>
+          <label class="field">Packaging / supplies ($)<input type="text" name="supplies" inputmode="decimal" placeholder="0.00"></label>
+        </div>
+        <label class="field">Target profit ($ total, optional)<input type="text" name="target" inputmode="decimal" placeholder="e.g. 100"></label>
+        <details class="fc-more"><summary>Fee settings &amp; extras</summary>
+          <div class="grid2">
+            <label class="field">Fee (%)<input type="text" name="fee_pct" inputmode="decimal" placeholder="0"></label>
+            <label class="field">Fixed fee ($ per order)<input type="text" name="fee_fixed" inputmode="decimal" placeholder="0.00"></label>
+          </div>
+          <div class="grid2">
+            <label class="field">Cash-out fee (%)<input type="text" name="cashout" inputmode="decimal" placeholder="0"></label>
+            <label class="field">Minimum fee ($)<input type="text" name="fee_min" inputmode="decimal" placeholder="0.00"></label>
+          </div>
+          <div class="grid2">
+            <label class="field" id="fc-btax-wrap">Buyer’s sales tax (%)<input type="text" name="buyer_tax" inputmode="decimal" placeholder="6.625"></label>
+            <label class="field">Shipping buyer pays ($)<input type="text" name="buyer_ship" inputmode="decimal" placeholder="0.00"></label>
+          </div>
+          <p class="hint" id="fc-feenote"></p>
+          <button type="button" class="linkbtn" id="fc-preset">Reset fees to the platform preset</button>
+        </details>
+      </form>
+      <div class="fc-out" id="fc-out" aria-live="polite"></div>
+      <p class="f" id="fc-asof"></p>
+    </div>
     <div class="card">
       <p class="t">Appearance</p>
       <div class="seg" id="theme-seg" style="margin-top:10px"><button data-t="light">Light</button><button data-t="dark">Dark</button><button data-t="auto">Auto</button></div>
@@ -307,14 +348,22 @@
     <label class="field">Platform you're selling on<select name="platform" required><option value="" disabled selected>Choose a platform</option><option value="ebay">eBay</option><option value="stockx">StockX</option><option value="facebook">Facebook Marketplace</option><option value="mercari">Mercari</option><option value="other">Local / Other</option></select></label>
     <label class="field" data-other hidden>Platform name<input type="text" name="platform_custom" maxlength="80" placeholder="e.g. OfferUp, local meetup"></label>
     <label class="field">Selling fee % for this listing<input type="text" name="fee_pct" inputmode="decimal" placeholder="Enter fee %, e.g. 13.25" required></label>
-    <p class="hint">Platforms set individual rates (by category, seller level, promos), so enter the rate for this listing. 0 is fine for local cash sales.</p>
+    <p class="hint" id="sl-feehint">Pick a platform to fill its standard fee. Platforms vary by category and seller level, so edit it if yours differs. 0 is fine for local cash sales.</p>
+    <label class="field">Quantity<input type="text" name="qty" inputmode="numeric" placeholder="1" value="1"></label>
+    <p class="hint" id="sl-qtyhint">Each unit can be sold separately. Default 1.</p>
+    <div class="field">Cost entry<div class="seg" id="sl-costmode"><button type="button" data-m="unit" class="on">Per unit</button><button type="button" data-m="total">Total for all</button></div></div>
     <div class="grid2">
-      <label class="field">Cost paid ($)<input type="text" name="cost" inputmode="decimal" placeholder="0.00" required></label>
-      <label class="field">List / sale price ($)<input type="text" name="price" inputmode="decimal" placeholder="0.00" required></label>
+      <label class="field"><span id="sl-cost-lbl">Cost per unit ($)</span><input type="text" name="cost" inputmode="decimal" placeholder="0.00" required></label>
+      <label class="field">List price per unit ($)<input type="text" name="price" inputmode="decimal" placeholder="0.00" required></label>
     </div>
-    <label class="field">Shipping cost ($, optional)<input type="text" name="shipping" inputmode="decimal" placeholder="0.00"></label>
+    <div class="grid2">
+      <label class="field">Sales tax paid (%)<input type="text" name="tax_pct" inputmode="decimal" placeholder="e.g. 6.625"></label>
+      <label class="field">Shipping to you ($)<input type="text" name="in_ship" inputmode="decimal" placeholder="0.00"></label>
+    </div>
+    <p class="hint">Tax and shipping to you are optional; they’re spread across the units.</p><p class="hint" id="sl-costsum"></p>
+    <label class="field">Shipping to buyer ($ per unit, optional)<input type="text" name="shipping" inputmode="decimal" placeholder="0.00"></label>
     <label class="field">Notes (optional)<textarea name="notes" rows="2" maxlength="2000" placeholder="Size, condition, buyer…"></textarea></label>
-    <div class="field">Status<div class="seg" id="sl-status"><button type="button" data-s="active" class="on">Active</button><button type="button" data-s="sold">Sold</button></div></div>
+    <div class="field" hidden>Status<div class="seg" id="sl-status"><button type="button" data-s="active" class="on">Active</button><button type="button" data-s="sold">Sold</button></div></div>
     <div class="calc" id="sl-calc"></div>
     <div class="price-box">
       <label class="check"><input type="checkbox" name="drop_alert"> Alert me if market value drops below what I paid</label>
@@ -323,6 +372,32 @@
     <p class="msg" id="sl-msg"></p>
     <div class="actions"><button class="btn buy" type="submit">Save listing</button><button class="btn" type="button" data-close>Cancel</button></div>
     <div class="actions"><button class="btn ghost danger" type="button" id="sl-delete" hidden>Delete listing</button></div>
+  </form>
+</div>
+<div class="sheet" id="sheet-usale" hidden role="dialog" aria-modal="true" aria-labelledby="su-title">
+  <form id="usale-form" autocomplete="off" novalidate>
+    <div class="sheet-grab"></div>
+    <p class="t" id="su-title">Record sale</p>
+    <p class="d" id="su-sub"></p>
+    <div class="grid2">
+      <label class="field">Units sold<input type="text" name="units" inputmode="numeric" value="1"></label>
+      <label class="field">Price per unit ($)<input type="text" name="price_unit" inputmode="decimal" placeholder="0.00"></label>
+    </div>
+    <div class="chips" id="su-chips"><button type="button" class="chip" data-u="1">1</button><button type="button" class="chip" data-u="all">All left</button></div>
+    <label class="field">Platform<select name="platform"><option value="ebay">eBay</option><option value="stockx">StockX</option><option value="facebook">Facebook Marketplace</option><option value="mercari">Mercari</option><option value="other">Local / Other</option></select></label>
+    <label class="field" data-other hidden>Platform name<input type="text" name="platform_custom" maxlength="80" placeholder="e.g. OfferUp, local meetup"></label>
+    <div class="grid2">
+      <label class="field">Selling fee %<input type="text" name="fee_pct" inputmode="decimal" placeholder="0"></label>
+      <label class="field">Shipping for this sale ($)<input type="text" name="shipping" inputmode="decimal" placeholder="0.00"></label>
+    </div>
+    <p class="hint" id="su-feehint"></p>
+    <label class="field">Serial / IMEI (optional)<input type="text" name="serial" maxlength="80" list="su-serials" placeholder="Pick a logged phone or type it"></label>
+    <datalist id="su-serials"></datalist>
+    <label class="field">Notes (optional)<input type="text" name="notes" maxlength="500" placeholder="Buyer, order #…"></label>
+    <div class="calc" id="su-calc"></div>
+    <p class="msg" id="su-msg"></p>
+    <div class="actions"><button class="btn buy" type="submit">Save sale</button><button class="btn" type="button" data-close>Cancel</button></div>
+    <div class="actions"><button class="btn ghost danger" type="button" id="su-delete" hidden>Delete this sale</button></div>
   </form>
 </div>
 <div class="sheet" id="sheet-sale" hidden role="dialog" aria-modal="true" aria-labelledby="ss-title">

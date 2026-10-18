@@ -598,7 +598,116 @@
   // same formula as the database: profit = price − price×fee% − shipping − cost
   const pnl = (price, fee, ship, cost) => { const f = r2(price * fee / 100); return { fee: f, net: r2(price - price * fee / 100 - ship), profit: r2(price - price * fee / 100 - ship - cost) }; };
   const cls = (n) => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
+  // Quantity: a listing holds qty units at unit_cost each (price paid + tax share + inbound shipping share). Each sale of N units is a
+  // row in l.sales; COGS = N × unit_cost. These rows (plus alert sales) feed Sold and the Sales overview.
+  const leftOf = (l) => l.units_left ?? (l.status === 'sold' ? 0 : 1), qtyOf = (l) => l.qty ?? 1, unitCost = (l) => +(l.unit_cost ?? l.cost);
+  const unitSales = () => ext.listings.flatMap((l) => (l.sales || []).map((u) => ({ u, l })));
+  const usRow = ({ u, l }) => ({ kind: 'unit', id: u.id, listing_id: l.id, item: l.item, item_type: l.item_type, platform: u.platform, platform_custom: u.platform_custom,
+    price: r2(u.units * +u.price_unit), unit_price: +u.price_unit, units: u.units, cost: r2(u.units * unitCost(l)), fee_pct: +u.fee_pct, shipping: +u.shipping, when: u.sold_at, alert_id: u.alert_id, serial: u.serial });
+  const unitSaleFor = (alertId) => unitSales().find(({ u }) => u.alert_id === alertId);
   const pct = (n) => (Math.round(n * 1000) / 1000).toString();
+  // ================= Fee & profit calculator (Settings). Pure client-side; defaults saved in localStorage only. =================
+  // Platform fee presets. Each is verified against the platform's own help page on FEES_ASOF; edit the fields in the app if a rate changes.
+  //  base: what the % fee is charged on. 'item' = sale price; 'item+ship' = price + shipping the buyer pays;
+  //        'total' = price + buyer shipping + buyer's sales tax (eBay "total amount of the sale", Meta "total Transaction value").
+  const FEES_ASOF = 'Oct 18, 2026';
+  const FEE_PRESETS = {
+    // eBay: https://www.ebay.com/help/selling/fees-credits-invoices/selling-fees?id=4822 (read Oct 18, 2026)
+    //  Most categories 13.6% of the total amount of the sale (≤ $7,500) + $0.40 per order ($0.30 if the order is $10 or less).
+    //  Men's/Women's Athletic Shoes: 8% and no per-order fee when the total is $150 or more; under $150 → 13.6% + per-order fee.
+    //  Total amount of the sale = item price + handling + shipping charged to the buyer + sales tax + other fees.
+    ebay: { label: 'eBay', base: 'total', rule: (t, cat) => cat === 'sneakers' && t >= 150 ? { pct: 8, fixed: 0 } : { pct: 13.6, fixed: t <= 10 ? 0.30 : 0.40 },
+      note: 'eBay charges its % on the whole order: price + shipping the buyer pays + the buyer’s sales tax. Per-order fee $0.40 ($0.30 on orders of $10 or less). Sneakers: 8% with no per-order fee at $150+ total.' },
+    // Mercari US: https://www.mercari.com/us/help_center/article/169/ (updated 05/07/2026; read Oct 18, 2026)
+    //  10% selling fee on item price + buyer-paid shipping; no payment processing fee on listings since Jan 6, 2025.
+    mercari: { label: 'Mercari', base: 'item+ship', rule: () => ({ pct: 10, fixed: 0 }), note: 'Mercari: 10% of item price + shipping the buyer pays. No separate processing fee. Balance withdrawal fees are not included.' },
+    // Facebook local pickup: no selling fee (Meta only charges on Marketplace checkout/shipped orders).
+    fb_local: { label: 'Facebook Marketplace (local, cash)', base: 'item', rule: () => ({ pct: 0, fixed: 0 }), note: 'Local pickup paid in cash/off-platform: no Facebook fee. Set your shipping to $0.' },
+    // Facebook shipped: https://transparency.meta.com/policies/other-policies/terms-of-service/ → Onsite Checkout Payments Features Terms
+    //  (updated Sep 23, 2025; read Oct 18, 2026): US Marketplace selling fee 10% of total transaction value, minimum $0.80.
+    fb_ship: { label: 'Facebook Marketplace (shipped)', base: 'total', rule: () => ({ pct: 10, fixed: 0, min: 0.80 }), note: 'Facebook shipped: 10% of the total transaction (price + shipping + tax), $0.80 minimum.' },
+    // StockX: https://stockx.com/help/articles/What-are-StockXs-fees-for-Sellers (read Oct 18, 2026): Verified Marketplace = transaction fee by
+    //  Seller Level (Level 1 9% … Level 5 7%) + 3% payment processing; US minimum seller fee $5.
+    //  US seller shipping fee for standard (non-Flex) sales is $5 since Mar 1, 2026: https://stockx.com/news/en-us/updates-to-the-stockx-seller-program/
+    stockx: { label: 'StockX', base: 'item', rule: () => ({ pct: 12, fixed: 5, min: 5 }), note: 'StockX Level 1: 9% transaction + 3% processing = 12% (min $5), plus the $5 seller shipping fee (in Fixed). StockX gives you the label, so set your shipping to $0. Higher levels: 11.5% / 11% / 10.5% / 10%.' },
+    // GOAT: https://www.goat.com/fees (last updated Aug 1, 2026; read Oct 18, 2026): 9.5% commission (seller rating 90+) + seller fee
+    //  (US prepaid shipping $5, US drop-off $0); 2.9% cash-out fee on ACH/PayPal cash-outs.
+    goat: { label: 'GOAT', base: 'item', rule: () => ({ pct: 9.5, fixed: 5, cashout: 2.9 }), note: 'GOAT: 9.5% commission + $5 seller fee (prepaid shipping; $0 if you drop off) + 2.9% cash-out fee on what you withdraw. Set your shipping to $0 if you use GOAT’s label.' },
+    custom: { label: 'Custom', base: 'item', rule: () => ({ pct: 0, fixed: 0 }), note: 'Enter your own fee % and fixed fee.' },
+  };
+  const FC_LISTING = { ebay: 'ebay', mercari: 'mercari', facebook: 'fb_ship', stockx: 'stockx' };   // listing/sale form platform → preset
+  const presetFor = (plat, total = 100, cat = 'general') => { const p = FEE_PRESETS[FC_LISTING[plat] || plat]; return p ? { ...p, ...p.rule(total, cat) } : null; };
+  // One unit = one order. Same core formula as pnl() (price − fee − shipping − cost); with a Custom % fee and nothing else they match exactly.
+  function feeMath(i) {
+    const P = i.price, B = i.buyerShip;
+    const tot = P + B + (i.base === 'total' ? (P + B) * i.buyerTax / 100 : 0), base = i.base === 'item' ? P : i.base === 'item+ship' ? P + B : tot;
+    const rr = i.auto ? i.rule(tot, i.cat) : null, pctv = rr ? rr.pct : i.pct, fixed = rr ? rr.fixed : i.fixed, min = rr ? (rr.min || 0) : i.min, co = rr ? (rr.cashout || 0) : i.cashout;
+    const fee1 = Math.max(min, base * pctv / 100) + fixed, gross = P + B, cash = Math.max(0, gross - fee1) * co / 100;
+    const fees = fee1 + cash, net = gross - fees, cost = i.cost * (1 + (i.taxOn ? i.tax : 0) / 100) + i.ship + i.supplies;
+    return { fees, net, cost, profit: net - cost, pct: pctv, fixed, min, cashout: co };
+  }
+  function solvePrice(i, want) {   // smallest price with profit ≥ want (fees are piecewise, so bisect)
+    const f = (P) => feeMath({ ...i, price: P }).profit;
+    if (f(0) >= want) return 0;
+    let lo = 0, hi = Math.max(100, (i.cost * 1.1 + i.ship + i.supplies + Math.max(want, 0)) * 3);
+    for (let n = 0; f(hi) < want && n < 30; n++) hi *= 2;
+    if (f(hi) < want) return null;
+    for (let n = 0; n < 60; n++) { const m = (lo + hi) / 2; if (f(m) >= want) hi = m; else lo = m; }
+    return Math.ceil(hi * 100) / 100;
+  }
+  const fcF = () => $('#fc-form');
+  const fcSaved = () => { try { return JSON.parse(localStorage.getItem('rd-calc') || '{}'); } catch (e) { return {}; } };
+  let fcOverride = false;
+  function fcInit() {
+    const f = fcF(); if (!f) return;
+    f.platform.innerHTML = Object.entries(FEE_PRESETS).map(([k, p]) => `<option value="${k}">${esc(p.label)}</option>`).join('');
+    const s = fcSaved();
+    f.platform.value = FEE_PRESETS[s.platform] ? s.platform : 'ebay'; f.ebay_cat.value = s.ebay_cat || 'general';
+    f.tax.value = s.tax ?? pct(TAX * 100); f.tax_on.checked = s.tax_on ?? true; f.buyer_tax.value = s.buyer_tax ?? pct(TAX * 100);
+    $('#fc-asof').innerHTML = `Rates as of ${FEES_ASOF}, from each platform’s help page. Edit if they’ve changed. Each unit counts as its own order.`;
+    fcApplyPreset(); fcRender();
+  }
+  function fcSave() { const f = fcF(); localStorage.setItem('rd-calc', JSON.stringify({ platform: f.platform.value, ebay_cat: f.ebay_cat.value, tax: f.tax.value, tax_on: f.tax_on.checked, buyer_tax: f.buyer_tax.value })); }
+  function fcApplyPreset() { fcOverride = false; const f = fcF(), p = FEE_PRESETS[f.platform.value]; $('#fc-cat-wrap').hidden = f.platform.value !== 'ebay'; $('#fc-btax-wrap').hidden = p.base !== 'total'; $('#fc-feenote').textContent = p.note; }
+  function fcInputs() {
+    const f = fcF(), p = FEE_PRESETS[f.platform.value], v = (el, d = 0) => { const n = num(el.value); return isFinite(n) ? n : d; };
+    return { base: p.base, rule: p.rule, cat: f.ebay_cat.value, auto: !fcOverride, price: v(f.price), qty: Math.max(1, Math.round(v(f.qty, 1))), cost: v(f.cost),
+      taxOn: f.tax_on.checked, tax: v(f.tax, TAX * 100), ship: v(f.ship), supplies: v(f.supplies), buyerShip: v(f.buyer_ship), buyerTax: p.base === 'total' ? v(f.buyer_tax, 0) : 0,
+      pct: v(f.fee_pct), fixed: v(f.fee_fixed), min: v(f.fee_min), cashout: v(f.cashout), target: num(f.target.value) };
+  }
+  function fcRender() {
+    const f = fcF(); if (!f) return;
+    const i = fcInputs(), r = feeMath(i), q = i.qty, has = num(f.price.value) > 0 || num(f.cost.value) > 0;
+    if (!fcOverride) { f.fee_pct.value = pct(r.pct); f.fee_fixed.value = r.fixed ? r.fixed.toFixed(2) : '0'; f.fee_min.value = r.min ? r.min.toFixed(2) : '0'; f.cashout.value = pct(r.cashout); }
+    const be = solvePrice(i, 0), tgt = isFinite(i.target) ? solvePrice(i, i.target / q) : undefined, sale = i.price * q, cost = r.cost * q, profit = r.profit * q;
+    const pctTxt = (a, b) => b > 0 ? (a / b * 100).toFixed(1) + '%' : '—';
+    $('#fc-out').innerHTML = !has ? '<p class="hint">Enter a sale price and what you paid to see fees and profit.</p>' : `
+      <div class="fc-hero ${profit >= 0 ? 'pos' : 'neg'}"><small>Profit${q > 1 ? ` (${q} units)` : ''}</small><b>${money(r2(profit))}</b><span>margin ${pctTxt(profit, sale)} · ROI ${pctTxt(profit, cost)}</span></div>
+      <div class="mgrid fc-grid">
+        <div><small>Platform fees</small><b>${r.fees > 0 ? '−' : ''}${money(r2(r.fees * q))}</b></div>
+        <div><small>Net payout</small><b>${money(r2(r.net * q))}</b></div>
+        <div><small>Total cost</small><b>${money(r2(cost))}</b></div>
+        <div><small>Margin</small><b class="${cls(profit)}">${pctTxt(profit, sale)}</b></div>
+        <div><small>ROI</small><b class="${cls(profit)}">${pctTxt(profit, cost)}</b></div>
+        <div><small>Break-even price</small><b>${be == null ? '—' : money(be)}</b></div>
+        ${tgt !== undefined ? `<div class="wide"><small>Price for ${money(i.target)} profit</small><b>${tgt == null ? '—' : money(tgt) + (q > 1 ? ' each' : '')}</b></div>` : ''}
+      </div>
+      <p class="f">Fees: ${esc(pct(r.pct))}%${r.min ? ` (min ${money(r.min)})` : ''}${r.fixed ? ` + ${money(r.fixed)}/order` : ''}${r.cashout ? ` + ${esc(pct(r.cashout))}% cash-out` : ''}${i.base === 'total' ? ` on price + buyer shipping + ${esc(pct(i.buyerTax))}% buyer tax` : i.base === 'item+ship' ? ' on price + buyer shipping' : ' on the sale price'}. Total cost = item${i.taxOn ? ` + ${esc(pct(i.tax))}% tax` : ''} + your shipping + supplies${q > 1 ? ', per unit × ' + q : ''}.</p>`;
+  }
+  if (fcF()) {
+    fcInit();
+    fcF().addEventListener('input', (e) => {
+      const n = e.target.name;
+      if (['fee_pct', 'fee_fixed', 'fee_min', 'cashout'].includes(n)) fcOverride = true;
+      if (n === 'platform' || n === 'ebay_cat') fcApplyPreset();
+      if (['platform', 'ebay_cat', 'tax', 'tax_on', 'buyer_tax'].includes(n)) fcSave();
+      fcRender();
+    });
+    fcF().platform.addEventListener('change', () => { fcApplyPreset(); fcSave(); fcRender(); });
+    $('#fc-preset').addEventListener('click', () => { fcApplyPreset(); fcRender(); });
+    $('#fc-reset').addEventListener('click', () => { const f = fcF(); ['item', 'price', 'qty', 'cost', 'ship', 'supplies', 'buyer_ship', 'target'].forEach((k) => (f[k].value = '')); fcApplyPreset(); fcRender(); });
+    window.rdFeeMath = { feeMath, solvePrice, FEE_PRESETS };   // exposed for the test harness only (no data)
+  }
   // ET helpers (datetime-local inputs are read and written as America/New_York wall time)
   const etPartsFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
   const etParts = (d) => { const o = {}; etPartsFmt.formatToParts(d).forEach((p) => (o[p.type] = p.value)); return o; };
@@ -688,38 +797,87 @@
   // ---------- listings
   let listingEdit = null, trackerPeriod = 'all';
   function renderListings() {
-    const rows = ext.listings.filter((l) => l.status === 'active');
+    const rows = ext.listings.filter((l) => leftOf(l) > 0);
     $('#listing-list').innerHTML = rows.map((l) => {
-      const r = pnl(+l.price, +l.fee_pct, +l.shipping, +l.cost);
+      const r = pnl(+l.price, +l.fee_pct, +l.shipping, unitCost(l)), q = qtyOf(l), left = leftOf(l), sold = (l.sales || []);
+      const soldProfit = r2(sold.reduce((a, u) => a + +u.profit, 0));
       return `<div class="card">
-        <div class="row"><p class="t grow">${esc(l.item)}</p><span class="pill ${esc(l.status)}">${l.status === 'sold' ? 'Sold' : 'Active'}</span></div>
-        <p class="d">${esc(platName(l))} · fee ${esc(pct(+l.fee_pct))}%${l.status === 'sold' && l.sold_at ? ' · sold ' + esc(et(l.sold_at)) : ' · listed ' + esc(et(l.created_at))}</p>
-        <div class="mgrid"><div><small>${l.status === 'sold' ? 'Sale' : 'List'} price</small><b>${money(+l.price)}</b></div><div><small>Fee</small><b>−${money(r.fee)}</b></div><div><small>Shipping</small><b>${+l.shipping ? '−' + money(+l.shipping) : money(0)}</b></div>
-          <div><small>Net payout</small><b>${money(r.net)}</b></div><div><small>Cost paid</small><b>${money(+l.cost)}</b></div><div class="big"><small>Profit</small><b class="${cls(r.profit)}">${money(r.profit)}</b></div></div>
+        <div class="row"><p class="t grow">${esc(l.item)}</p><span class="pill ${left ? 'active' : 'sold'} qpill">${left ? `${left} of ${q} left` : 'Sold out'}</span></div>
+        <p class="d">${esc(platName(l))} · fee ${esc(pct(+l.fee_pct))}% · listed ${esc(et(l.created_at))}${q > 1 ? ` · ${q} units at ${money(unitCost(l))} each` : ''}</p>
+        <div class="mgrid"><div><small>List price${q > 1 ? ' / unit' : ''}</small><b>${money(+l.price)}</b></div><div><small>Fee</small><b>−${money(r.fee)}</b></div><div><small>Shipping</small><b>${+l.shipping ? '−' + money(+l.shipping) : money(0)}</b></div>
+          <div><small>Net payout</small><b>${money(r.net)}</b></div><div><small>Cost${q > 1 ? ' / unit' : ' paid'}</small><b>${money(unitCost(l))}</b></div><div class="big"><small>Profit${q > 1 ? ' / unit' : ''}</small><b class="${cls(r.profit)}">${money(r.profit)}</b></div></div>
+        ${sold.length ? `<p class="sold-line">Sold ${l.units_sold} so far · profit <span class="${cls(soldProfit)}">${money(soldProfit)}</span></p>` : ''}
         ${l.notes ? `<p class="f">${esc(l.notes)}</p>` : ''}
         ${priceLine(priceRow('listing', l.id), +l.cost)}
-        <div class="actions"><button class="btn" data-ledit="${l.id}">Edit</button>${l.status === 'active' ? `<button class="btn" data-lsold="${l.id}">Mark sold</button>` : ''}<button class="btn ghost danger" data-ldel="${l.id}">Delete</button></div>
+        <div class="actions"><button class="btn buy" data-lsold="${l.id}">Record sale</button><button class="btn" data-ledit="${l.id}">Edit</button><button class="btn ghost danger" data-ldel="${l.id}">Delete</button></div>
       </div>`;
-    }).join('') || `<p class="empty">${ext.listings.length ? 'No active listings. Sold ones are under Sold.' : 'No listings yet. Tap + New listing.'}</p>`;
+    }).join('') || `<p class="empty">${ext.listings.length ? 'Nothing left in stock. Sold ones are under Sold.' : 'No listings yet. Tap + New listing.'}</p>`;
     renderSold();
   }
-  // Sold history: sold listings + alerts marked sold, each shown once (a listing linked to an alert is one record)
+  // Sold history: each unit sale from a listing + alerts marked sold
   function renderSold() {
-    const rows = [...ext.listings.filter((l) => l.status === 'sold').map((l) => ({ kind: 'listing', r: l, when: l.sold_at || l.updated_at })),
-      ...ext.sales.map((x) => ({ kind: 'sale', r: x, when: x.sold_at }))].sort((a, b) => String(b.when).localeCompare(String(a.when)));
-    $('#sold-list').innerHTML = rows.map(({ kind, r, when }) => { const m = pnl(+r.price, +r.fee_pct, +r.shipping, +r.cost);
-      return `<div class="card"><div class="row"><p class="t grow">${esc(r.item)}</p><span class="pill sold">${kind === 'sale' || r.alert_id ? 'From alert' : 'Listing'}</span></div>
-        <p class="d">${esc(platName(r))} · fee ${esc(pct(+r.fee_pct))}% · sold ${esc(et(when))}</p>
+    const rows = [...unitSales().map(usRow), ...ext.sales.map((x) => ({ kind: 'sale', ...x, when: x.sold_at }))].sort((a, b) => String(b.when).localeCompare(String(a.when)));
+    $('#sold-list').innerHTML = rows.map((r) => { const m = pnl(+r.price, +r.fee_pct, +r.shipping, +r.cost), L = r.kind === 'unit' ? ext.listings.find((l) => l.id === r.listing_id) : null;
+      return `<div class="card"><div class="row"><p class="t grow">${esc(r.item)}</p><span class="pill sold">${r.alert_id ? 'From alert' : 'Listing'}</span></div>
+        <p class="d">${r.kind === 'unit' && (r.units > 1 || qtyOf(L) > 1) ? `${r.units} × ${money(r.unit_price)} · ` : ''}${esc(platName(r))} · fee ${esc(pct(+r.fee_pct))}% · sold ${esc(et(r.when))}${L && qtyOf(L) > 1 ? ` · ${leftOf(L) ? leftOf(L) + ' of ' + qtyOf(L) + ' left' : 'sold out'}` : ''}${r.serial ? ' · SN ' + esc(r.serial) : ''}</p>
         <div class="mgrid"><div><small>Sale</small><b>${money(+r.price)}</b></div><div><small>Fees + ship</small><b>−${money(r2(m.fee + +r.shipping))}</b></div><div class="big"><small>Profit</small><b class="${cls(m.profit)}">${money(m.profit)}</b></div></div>
-        <div class="actions"><button class="btn" data-sedit="${kind}:${kind === 'sale' ? r.alert_id || '' : r.id}">Edit</button></div></div>`; }).join('') || '<p class="empty">No sales yet. Mark a listing sold, or tap “Mark as sold” on an alert.</p>';
+        <div class="actions"><button class="btn" data-sedit="${r.kind}:${r.kind === 'sale' ? r.alert_id || '' : r.id}">Edit</button></div></div>`; }).join('') || '<p class="empty">No sales yet. Tap Record sale on a listing, or “Mark as sold” on an alert.</p>';
   }
   $('#sold-list').addEventListener('click', (e) => { const b = e.target.closest('[data-sedit]'); if (!b) return; const [k, id] = b.dataset.sedit.split(':');
-    if (k === 'listing') openListing(ext.listings.find((l) => l.id === +id));
+    if (k === 'unit') { const x = unitSales().find(({ u }) => u.id === +id); if (x) openUnitSale(x.l, x.u); }
     else { const s = ext.sales.find((x) => x.alert_id === id); const a = state.alerts.find((x) => x.id === id) || { id, item: s?.item, ts: s?.sold_at }; openSale(a); } });
+  // ---------- Record a sale of N units from a listing (quantity / inventory)
+  let usCtx = null;
+  function usaleCalc() {
+    const f = $('#usale-form'); if (!usCtx) return; const L = usCtx.l, n = Math.round(num(f.units.value)), pu = num(f.price_unit.value);
+    if (!(n >= 1) || !isFinite(pu)) { $('#su-calc').innerHTML = ''; return; }
+    const ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value), rev = r2(n * pu), cogs = r2(n * unitCost(L)), r = pnl(rev, num(f.fee_pct.value) || 0, ship || 0, cogs);
+    $('#su-calc').innerHTML = `<div class="mgrid"><div><small>Revenue</small><b>${money(rev)}</b></div><div><small>Fee</small><b>−${money(r.fee)}</b></div><div><small>Shipping</small><b>${ship ? '−' + money(ship) : money(0)}</b></div>
+      <div><small>Cost (${n} × ${money(unitCost(L))})</small><b>−${money(cogs)}</b></div><div><small>Margin</small><b class="${cls(r.profit)}">${rev > 0 ? (r.profit / rev * 100).toFixed(1) + '%' : '—'}</b></div><div class="big"><small>Profit</small><b class="${cls(r.profit)}">${money(r.profit)}</b></div></div>`;
+  }
+  function openUnitSale(L, u) {
+    const f = $('#usale-form'); f.reset(); usCtx = { l: L, u: u || null };
+    const max = leftOf(L) + (u ? u.units : 0);
+    $('#su-title').textContent = u ? 'Edit sale' : 'Record sale';
+    $('#su-sub').textContent = `${L.item} · ${leftOf(L)} of ${qtyOf(L)} left · cost ${money(unitCost(L))} per unit`;
+    f.units.value = u ? u.units : 1; f.units.dataset.max = max;
+    f.price_unit.value = u ? (+u.price_unit).toFixed(2) : (+L.price ? (+L.price).toFixed(2) : '');
+    f.platform.value = u ? u.platform : L.platform; f.platform_custom.value = u ? (u.platform_custom || '') : (L.platform_custom || '');
+    f.fee_pct.value = pct(u ? +u.fee_pct : +L.fee_pct); f.shipping.value = u ? (+u.shipping ? (+u.shipping).toFixed(2) : '') : (+L.shipping ? (+L.shipping).toFixed(2) : '');
+    f.shipping.dataset.auto = u ? '' : '1'; f.serial.value = u ? (u.serial || '') : ''; f.notes.value = u ? (u.notes || '') : '';
+    $('#su-serials').innerHTML = (ph.phones || []).filter((p) => p.serial).slice(0, 300).map((p) => `<option value="${esc(p.serial)}">${esc([p.item_name || p.model, p.color, p.storage].filter(Boolean).join(' '))}</option>`).join('');
+    $('#su-chips').hidden = max <= 1; $('#su-delete').hidden = !u; $('#su-msg').textContent = ''; $('#su-feehint').textContent = `Fee prefilled from the listing (${pct(+L.fee_pct)}%). Shipping is the total for this sale.`;
+    otherToggle(f); usaleCalc(); sheet('#sheet-usale');
+  }
+  $('#su-chips').addEventListener('click', (e) => { const b = e.target.closest('[data-u]'); if (!b) return; const f = $('#usale-form'); f.units.value = b.dataset.u === 'all' ? f.units.dataset.max : 1; f.units.dispatchEvent(new Event('input', { bubbles: true })); });
+  $('#usale-form').addEventListener('input', (e) => { const f = e.currentTarget;
+    if (e.target.name === 'shipping') f.shipping.dataset.auto = '';
+    if (e.target.name === 'units' && f.shipping.dataset.auto === '1' && usCtx && +usCtx.l.shipping) { const n = Math.round(num(f.units.value)); if (n >= 1) f.shipping.value = (n * +usCtx.l.shipping).toFixed(2); }
+    usaleCalc(); });
+  $('#usale-form').platform.addEventListener('change', (e) => { const f = e.target.form; otherToggle(f); f.fee_pct.value = ''; presetFee(f, $('#su-feehint')); usaleCalc(); });
+  $('#usale-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.currentTarget, msg = $('#su-msg'), L = usCtx.l, max = +f.units.dataset.max;
+    const n = num(f.units.value), pu = num(f.price_unit.value), fee = num(f.fee_pct.value), ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value);
+    const err = !(n >= 1) || n !== Math.round(n) ? 'Units sold must be a whole number, 1 or more.' : n > max ? `Only ${max} left to sell.` : !isFinite(pu) || pu < 0 ? 'Enter the sale price per unit.' :
+      feeErr(fee) || (!isFinite(ship) || ship < 0 ? 'Shipping must be 0 or more.' : (f.platform.value === 'other' && !f.platform_custom.value.trim()) ? 'Type the platform name for Local / Other.' : '');
+    if (err) { msg.textContent = err; return; }
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true; msg.textContent = 'Saving…';
+    try {
+      const sale = { units: n, price_unit: pu, fee_pct: fee, shipping: ship, platform: f.platform.value, platform_custom: f.platform_custom.value, serial: f.serial.value.trim(), notes: f.notes.value };
+      if (usCtx.u) { sale.alert_id = usCtx.u.alert_id; sale.sold_at = usCtx.u.sold_at; }
+      const nl = await call('rd_unit_sale_save', { p_listing_id: L.id, p_sale: sale, p_id: usCtx.u ? usCtx.u.id : null });
+      const i = ext.listings.findIndex((x) => x.id === L.id); if (i >= 0 && nl) ext.listings[i] = { ...ext.listings[i], ...nl };
+      closeSheet(); toast(nl && nl.units_left === 0 ? `${L.item} is sold out` : `Sale saved · ${nl ? nl.units_left : ''} left`); await refreshExt();
+    } catch (er) { msg.textContent = er.message || 'Couldn’t save the sale.'; } finally { btn.disabled = false; }
+  });
+  $('#su-delete').addEventListener('click', async () => {
+    if (!usCtx?.u) return; if (!(await confirmBox({ title: 'Delete this sale?', body: 'The units go back into stock. This can’t be undone.', ok: 'Delete', danger: true }))) return;
+    try { await call('rd_unit_sale_delete', { p_id: usCtx.u.id }); closeSheet(); toast('Sale deleted'); await refreshExt(); } catch (er) { $('#su-msg').textContent = er.message || 'Couldn’t delete.'; }
+  });
   // ---------- Sales overview (Stripe-style): range picker drives 3 cards, dotted line chart (+ dashed estimate) and the revenue→net waterfall
   let sdMetric = 'rev', sdSel = null, sdType = null;
   const SD_LABEL = { rev: 'Revenue', profit: 'Net profit', fee: 'Fees', cost: 'Cost', ship: 'Shipping' };
-  const soldRows = () => [...ext.listings.filter((l) => l.status === 'sold').map((l) => ({ ...l, when: l.sold_at || l.updated_at })), ...ext.sales.map((x) => ({ ...x, when: x.sold_at }))].filter((x) => x.when);
+  const soldRows = () => [...unitSales().map(usRow), ...ext.sales.map((x) => ({ ...x, when: x.sold_at }))].filter((x) => x.when);
   const dayLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
   const dLab = (k) => dayLabel.format(new Date(k + 'T12:00:00Z'));
   const addDays = (k, n) => new Date(Date.parse(k + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);
@@ -732,9 +890,9 @@
     const all = allT.filter((x) => sdType === null || typeOfSale(x) === sdType), rows = all.filter((x) => etKey(new Date(x.when)) >= from);
     const t = rows.reduce((a, x) => { const r = pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost); a.rev += +x.price; a.fee += r.fee; a.ship += +x.shipping; a.cost += +x.cost; a.profit += r.profit; return a; }, { rev: 0, fee: 0, ship: 0, cost: 0, profit: 0 });
     Object.keys(t).forEach((k) => (t[k] = r2(t[k])));
-    const active = ext.listings.filter((l) => l.status === 'active' && (sdType === null || typeOfSale(l) === sdType)), unsoldCost = r2(active.reduce((a, l) => a + +l.cost, 0));
+    const active = ext.listings.filter((l) => leftOf(l) > 0 && (sdType === null || typeOfSale(l) === sdType)), unsoldCost = r2(active.reduce((a, l) => a + unitCost(l) * leftOf(l), 0)), unsoldN = active.reduce((a, l) => a + leftOf(l), 0);
     const n = rows.length, rangeTxt = trackerPeriod === 'all' ? 'all time' : `last ${trackerPeriod} days`;
-    $('#sd-cards').innerHTML = `<div class="sd-card"><small>Money invested</small><b>${money(t.cost)}</b><span>item cost of ${n} sale${n === 1 ? '' : 's'}${active.length ? ` · +${money(unsoldCost)} in ${active.length} unsold` : ''}</span></div>
+    $('#sd-cards').innerHTML = `<div class="sd-card"><small>Money invested</small><b>${money(t.cost)}</b><span>item cost of ${n} sale${n === 1 ? '' : 's'}${unsoldN ? ` · +${money(unsoldCost)} in ${unsoldN} unsold unit${unsoldN === 1 ? '' : 's'}` : ''}</span></div>
       <div class="sd-card"><small>Money made</small><b>${money(t.rev)}</b><span>net profit <b class="${cls(t.profit)}" style="display:inline;font-size:inherit">${money(t.profit)}</b></span></div>
       <div class="sd-card"><small>Money lost</small><b>${money(r2(t.fee + t.ship))}</b><span>fees ${money(t.fee)} · shipping ${money(t.ship)}</span></div>`;
     // daily buckets (ET) for the chart; each dot = a day with real sales
@@ -757,10 +915,10 @@
     const recent = all.filter((x) => etKey(new Date(x.when)) >= addDays(today, -89)).sort((a, b) => String(a.when).localeCompare(String(b.when)));
     if (recent.length < 3 || !active.length) return null;
     const days = (Date.parse(recent[recent.length - 1].when) - Date.parse(recent[0].when)) / 86400000, gap = Math.max(1, days / (recent.length - 1));
-    const avgOf = (item) => { const m = recent.filter((x) => x.item.trim().toLowerCase() === item.trim().toLowerCase()); return m.length ? m.reduce((a, x) => a + +x.price, 0) / m.length : null; };
+    const avgOf = (item) => { const m = recent.filter((x) => x.item.trim().toLowerCase() === item.trim().toLowerCase()); return m.length ? m.reduce((a, x) => a + (x.unit_price ?? +x.price), 0) / m.length : null; };   // per-unit price
     const out = []; let k = today;
-    active.slice(0, 8).forEach((l, i) => { const price = r2(avgOf(l.item) ?? +l.price), r = pnl(price, +l.fee_pct, +l.shipping, +l.cost); k = addDays(today, Math.round(gap * (i + 1)));
-      out.push({ k, n: 1, est: true, item: l.item, rev: price, fee: r.fee, cost: +l.cost, ship: +l.shipping, profit: r.profit }); });
+    active.slice(0, 8).forEach((l, i) => { const n = leftOf(l), price = r2((avgOf(l.item) ?? +l.price) * n), cost = r2(unitCost(l) * n), ship = r2(+l.shipping * n), r = pnl(price, +l.fee_pct, ship, cost); k = addDays(today, Math.round(gap * (i + 1)));
+      out.push({ k, n, est: true, item: l.item, rev: price, fee: r.fee, cost, ship, profit: r.profit }); });
     return { pts: out, gap: r2(gap), count: active.length };
   }
   function renderChart(pts, proj) {
@@ -812,7 +970,21 @@
   const setStatus = (s) => document.querySelectorAll('#sl-status button').forEach((b) => b.classList.toggle('on', b.dataset.s === s));
   const curStatus = () => $('#sl-status button.on').dataset.s;
   $('#sl-status').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { setStatus(b.dataset.s); } });
-  function listingCalc() { const f = $('#listing-form'); $('#sl-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), num(f.cost.value)); }
+  // listing form: quantity + per-unit/total cost entry (+ optional tax % and inbound shipping) → per-unit cost basis
+  let costMode = 'unit';
+  function listingNums() {
+    const f = $('#listing-form'), q = Math.round(num(f.qty.value)) || 1, c = num(f.cost.value), tx = f.tax_pct.value.trim() === '' ? 0 : num(f.tax_pct.value), ins = f.in_ship.value.trim() === '' ? 0 : num(f.in_ship.value);
+    const per = costMode === 'total' ? c / q : c, basis = per * (1 + (isFinite(tx) ? tx : 0) / 100) + (isFinite(ins) ? ins : 0) / q;
+    return { q, per, tx, ins, basis };
+  }
+  function listingCalc() {
+    const f = $('#listing-form'), n = listingNums();
+    $('#sl-costsum').innerHTML = isFinite(n.per) ? `Total cost <b>${money(r2(n.basis * n.q))}</b> · <b>${money(r2(n.basis))}</b> per unit${n.tx || n.ins ? ' (incl. tax / inbound shipping)' : ''}` : '';
+    $('#sl-calc').innerHTML = (n.q > 1 ? '<p class="hint">Per unit, at the list price:</p>' : '') + calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), n.basis);
+  }
+  const setCostMode = (m) => { costMode = m; document.querySelectorAll('#sl-costmode button').forEach((b) => b.classList.toggle('on', b.dataset.m === m)); $('#sl-cost-lbl').textContent = m === 'total' ? 'Total paid for all units ($)' : 'Cost per unit ($)'; listingCalc(); };
+  $('#sl-costmode').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const f = $('#listing-form'), n = listingNums();
+    if (b.dataset.m !== costMode && isFinite(n.per)) f.cost.value = (b.dataset.m === 'total' ? n.per * n.q : n.per).toFixed(2); setCostMode(b.dataset.m); });
   const typeOpts = (sel) => { sel.innerHTML = ITEM_TYPES.map((t) => `<option value="${t.id}">${esc(t.label.replace(/s$/, ''))}</option>`).join(''); };
   typeOpts($('#listing-form').item_type); typeOpts($('#sale-form').item_type);
   $('#listing-form').item.addEventListener('input', (e) => { const f = e.target.form; if (!f.item_type.dataset.touched) f.item_type.value = guessType(e.target.value); });
@@ -820,33 +992,46 @@
   ['#listing-form', '#sale-form'].forEach((id) => $(id).item_type.addEventListener('change', (e) => { e.target.dataset.touched = '1'; }));
   const tagType = (kind, id, t) => id ? call('rd_set_item_type', { p_kind: kind, p_id: id, p_type: t }).catch((x) => toast('Type not saved: ' + x.message)) : null;
   function openListing(l, sold) {
+    if (sold && l) { openUnitSale(l); return; }
     listingEdit = l || null; const f = $('#listing-form'); f.reset(); delete f.item_type.dataset.touched;
     $('#sl-title').textContent = l ? 'Edit listing' : 'New listing';
     f.item.value = l ? l.item : ''; f.platform.value = l ? l.platform : ''; f.platform_custom.value = l ? (l.platform_custom || '') : '';
     f.fee_pct.value = l ? pct(+l.fee_pct) : ''; f.cost.value = l ? (+l.cost).toFixed(2) : ''; f.price.value = l ? (+l.price).toFixed(2) : '';
     f.shipping.value = l && +l.shipping ? (+l.shipping).toFixed(2) : ''; f.notes.value = l ? (l.notes || '') : '';
+    f.qty.value = l ? qtyOf(l) : '1'; f.tax_pct.value = l && +l.tax_pct ? pct(+l.tax_pct) : ''; f.in_ship.value = l && +l.in_ship ? (+l.in_ship).toFixed(2) : ''; setCostMode('unit');
+    $('#sl-qtyhint').textContent = l && l.units_sold ? `${l.units_sold} sold so far, so quantity can’t go below ${l.units_sold}.` : 'Each unit can be sold separately. Default 1.';
     f.item_type.value = l ? typeOfSale(l) : 'other';
     setStatus(sold ? 'sold' : l ? l.status : 'active');
     const p = l && priceRow('listing', l.id); f.drop_alert.checked = !!(p && p.alert_on);
     $('#sl-price').innerHTML = (p && p.market_value != null) ? priceLine(p, +l.cost) : 'Uses your cost paid as the buy-in. No price source yet, so nothing is checked until one is added.';
-    $('#sl-delete').hidden = !l; $('#sl-msg').textContent = ''; otherToggle(f); listingCalc(); sheet('#sheet-listing');
+    $('#sl-delete').hidden = !l; $('#sl-msg').textContent = ''; otherToggle(f); if (f.platform.value) presetFee(f, $('#sl-feehint')); listingCalc(); sheet('#sheet-listing');
   }
   $('#listing-new').addEventListener('click', () => openListing(null));
   $('#listing-form').addEventListener('input', listingCalc);
-  $('#listing-form').platform.addEventListener('change', (e) => otherToggle(e.target.form));
+  $('#listing-form').platform.addEventListener('change', (e) => { otherToggle(e.target.form); presetFee(e.target.form, $('#sl-feehint')); listingCalc(); });
+  // Fee presets from the calculator: fill an empty fee % for the chosen platform (still editable)
+  function presetFee(f, hintEl) {
+    const p = presetFor(f.platform.value, num(f.price.value) || 100);
+    if (!p) { if (hintEl) hintEl.textContent = 'Local / Other: enter the fee you’ll pay (0 for cash).'; return; }
+    if (f.fee_pct.value.trim() === '' || f.fee_pct.dataset.preset === '1') { f.fee_pct.value = pct(p.pct); f.fee_pct.dataset.preset = '1'; }
+    if (hintEl) hintEl.textContent = `${p.label} preset: ${pct(p.pct)}%${p.fixed ? ` + ${money(p.fixed)}/order` : ''}${p.cashout ? ` + ${pct(p.cashout)}% cash-out` : ''} (rates as of ${FEES_ASOF}; fixed fees aren’t included in this %). Edit if your rate differs.`;
+  }
+  $('#listing-form').fee_pct.addEventListener('input', (e) => { delete e.target.dataset.preset; });
   $('#listing-form').addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target, msg = $('#sl-msg'); msg.className = 'msg err';
-    const fee = num(f.fee_pct.value), cost = num(f.cost.value), price = num(f.price.value), ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value);
+    const fee = num(f.fee_pct.value), n = listingNums(), cost = r2(n.per * 10000) / 10000, price = num(f.price.value), ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value), qn = num(f.qty.value);
     const err = !f.item.value.trim() ? 'Enter the item name.' : !f.platform.value ? 'Pick the platform you’re selling on.' : (f.platform.value === 'other' && !f.platform_custom.value.trim()) ? 'Type the platform name for Local / Other.' :
-      feeErr(fee) || (!isFinite(cost) || cost < 0 ? 'Enter what you paid (0 or more).' : !isFinite(price) || price < 0 ? 'Enter the list or sale price.' : !isFinite(ship) || ship < 0 ? 'Shipping must be 0 or more.' : '');
+      feeErr(fee) || (!isFinite(qn) || qn < 1 || qn !== Math.round(qn) ? 'Quantity must be a whole number, 1 or more.' : listingEdit && qn < (listingEdit.units_sold || 0) ? `Quantity can’t be below the ${listingEdit.units_sold} already sold.` :
+      !isFinite(n.per) || n.per < 0 ? 'Enter what you paid (0 or more).' : !isFinite(n.tx) || n.tx < 0 || n.tx > 30 ? 'Sales tax % must be 0–30.' : !isFinite(n.ins) || n.ins < 0 ? 'Inbound shipping must be 0 or more.' :
+      !isFinite(price) || price < 0 ? 'Enter the list price.' : !isFinite(ship) || ship < 0 ? 'Shipping must be 0 or more.' : '');
     if (err) { msg.textContent = err; return; }
-    const body = { item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, cost, price, shipping: ship, notes: f.notes.value, status: curStatus() };
+    const body = { item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, cost, price, shipping: ship, notes: f.notes.value, qty: qn, tax_pct: n.tx, in_ship: n.ins };
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
     try {
       const l = listingEdit ? await call('rd_listing_update', { p_id: listingEdit.id, p_listing: body }) : await call('rd_listing_add', { p_listing: body });
       await tagType('listing', l.id, f.item_type.value);
       const prev = priceRow('listing', l.id);
-      if (f.drop_alert.checked || prev) await call('rd_price_watch_save', { p_kind: 'listing', p_ref: String(l.id), p_cfg: { buy_in: l.cost, alert_on: f.drop_alert.checked, label: l.item, site: platName(l), member_id: me()?.id ?? null } });
+      if (f.drop_alert.checked || prev) await call('rd_price_watch_save', { p_kind: 'listing', p_ref: String(l.id), p_cfg: { buy_in: unitCost(l), alert_on: f.drop_alert.checked, label: l.item, site: platName(l), member_id: me()?.id ?? null } });
       closeSheet(); toast(listingEdit ? 'Listing updated' : 'Listing added'); await refreshExt();
     } catch (err2) { msg.className = 'msg err'; msg.textContent = err2.message; }
     btn.disabled = false;
@@ -860,7 +1045,7 @@
     const b = e.target.closest('button'); if (!b) return;
     const id = +(b.dataset.ledit || b.dataset.lsold || b.dataset.ldel), l = ext.listings.find((x) => x.id === id); if (!l) return;
     if (b.dataset.ledit) openListing(l);
-    else if (b.dataset.lsold) openListing(l, true);
+    else if (b.dataset.lsold) openUnitSale(l);
     else if (b.dataset.ldel && confirm('Delete this listing? This can’t be undone.')) {
       try { await call('rd_listing_delete', { p_id: id }); if (priceRow('listing', id)) await call('rd_price_watch_delete', { p_kind: 'listing', p_ref: String(id) }); toast('Listing deleted'); await refreshExt(); } catch (err) { toast(err.message); }
     }
@@ -869,8 +1054,8 @@
   // ---------- mark alert as sold
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const saleFor = (alertId) => ext.sales.find((s) => s.alert_id === alertId);
-  const listingFor = (alertId) => ext.listings.find((l) => l.alert_id === alertId);
-  const matchListing = (item) => { const n = norm(item); if (!n) return null; const pool = ext.listings.filter((l) => l.status === 'active' && !l.alert_id);
+  const listingFor = (alertId) => { const x = unitSaleFor(alertId); return x ? x.l : ext.listings.find((l) => l.alert_id === alertId); };
+  const matchListing = (item) => { const n = norm(item); if (!n) return null; const pool = ext.listings.filter((l) => leftOf(l) > 0);
     return pool.find((l) => norm(l.item) === n) || pool.find((l) => { const m = norm(l.item); return m.length > 3 && (n.includes(m) || m.includes(n)); }) || null; };
   const lastFee = (platform, custom) => {
     const all = [...ext.listings, ...ext.sales].filter((x) => x.platform === platform && (platform !== 'other' || !custom || norm(x.platform_custom) === norm(custom)));
@@ -883,14 +1068,15 @@
     const L = saleCtx.listing, plat = f.platform.value;
     if (L && (!plat || L.platform === plat)) { f.fee_pct.value = pct(+L.fee_pct); hint.textContent = `From your listing “${L.item}” (${platName(L)}). You can change it.`; }
     else if (plat) { const x = lastFee(plat, f.platform_custom.value); if (x) { f.fee_pct.value = pct(+x.fee_pct); hint.textContent = `Last fee you entered for ${platName(x)}. Platforms set individual rates, so edit if this sale differs.`; }
-      else { f.fee_pct.value = ''; hint.textContent = `No fee saved for ${PLATFORM[plat]} yet. Platforms set individual rates, so enter this sale’s fee %.`; } }
+      else { f.fee_pct.value = ''; presetFee(f, hint); } }
     else { f.fee_pct.value = ''; hint.textContent = 'Pick a platform. Platforms set individual rates, so enter this sale’s fee %.'; }
   }
-  const saleCost = () => { const f = $('#sale-form'); return saleCtx?.listing && f.use_listing.checked ? +saleCtx.listing.cost : num(f.cost.value); };
+  const saleCost = () => { const f = $('#sale-form'); return saleCtx?.listing && f.use_listing.checked ? unitCost(saleCtx.listing) : num(f.cost.value); };
   function saleCalc() { const f = $('#sale-form'); $('#ss-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), saleCost()); }
   const linkToggle = () => { const f = $('#sale-form'), on = !!(saleCtx.listing && f.use_listing.checked); $('#ss-cost-wrap').hidden = on; saleCalc(); };
   function openSale(a) {
-    const linked = listingFor(a.id); if (linked) { openListing(linked); return; }   // already one record: edit the listing itself
+    const us = unitSaleFor(a.id); if (us) { openUnitSale(us.l, us.u); return; }   // already recorded as a unit sale of a listing
+    const linked = listingFor(a.id); if (linked) { openListing(linked); return; }
     const s = saleFor(a.id), L = s ? null : matchListing(a.item || a.title), f = $('#sale-form'); f.reset(); delete f.item_type.dataset.touched;
     saleCtx = { alert: a, sale: s, listing: L, feeTouched: !!s };
     $('#ss-title').textContent = s ? 'Edit sale' : 'Mark as sold'; $('#ss-sub').textContent = `${a.store ? a.store + ' · ' : ''}${a.time_et || et(a.ts)}`;
@@ -898,7 +1084,7 @@
     f.platform.value = s ? s.platform : (L ? L.platform : ''); f.platform_custom.value = s ? (s.platform_custom || '') : (L ? (L.platform_custom || '') : '');
     f.cost.value = s ? (+s.cost).toFixed(2) : (L ? (+L.cost).toFixed(2) : ''); f.shipping.value = s && +s.shipping ? (+s.shipping).toFixed(2) : (L && +L.shipping ? (+L.shipping).toFixed(2) : '');
     if (s) { f.fee_pct.value = pct(+s.fee_pct); $('#ss-feehint').textContent = 'Fee % you entered for this sale. Platforms set individual rates.'; } else saleFee(true);
-    $('#ss-link-wrap').hidden = !L; if (L) { f.use_listing.checked = true; $('#ss-link-txt').textContent = `Sell my listing “${L.item}” (cost ${money(+L.cost)} stays on that listing)`; }
+    $('#ss-link-wrap').hidden = !L; if (L) { f.use_listing.checked = true; $('#ss-link-txt').textContent = `Sell 1 unit of my listing “${L.item}” (${leftOf(L)} of ${qtyOf(L)} left, cost ${money(unitCost(L))} each)`; }
     $('#ss-delete').hidden = !s; $('#ss-msg').textContent = ''; otherToggle(f); linkToggle(); sheet('#sheet-sale');
   }
   $('#sale-form').addEventListener('input', (e) => { if (e.target.name === 'fee_pct') saleCtx.feeTouched = true; if (e.target.name === 'platform_custom') saleFee(); if (e.target.name === 'use_listing') linkToggle(); saleCalc(); });
@@ -911,8 +1097,8 @@
     if (err) { msg.textContent = err; return; }
     try {
       const L = saleCtx.listing && f.use_listing.checked ? saleCtx.listing : null;
-      if (L) { await call('rd_listing_update', { p_id: L.id, p_listing: { item: L.item, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, cost: +L.cost, price, shipping: ship, notes: L.notes, status: 'sold' } });
-        await call('rd_listing_link_alert', { p_id: L.id, p_alert_id: saleCtx.alert.id }); await tagType('listing', L.id, f.item_type.value); }
+      if (L) { await call('rd_unit_sale_save', { p_listing_id: L.id, p_sale: { units: 1, price_unit: price, fee_pct: fee, shipping: ship, platform: f.platform.value, platform_custom: f.platform_custom.value, alert_id: saleCtx.alert.id } });
+        await tagType('listing', L.id, f.item_type.value); }
       else { const sv = await call('rd_sale_save', { p_sale: { alert_id: saleCtx.alert.id, item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, price, cost, shipping: ship } }); await tagType('sale', sv && sv.id, f.item_type.value); }
       closeSheet(); toast('Sale saved'); await refreshExt(); } catch (err2) { msg.textContent = err2.message; }
   });
@@ -921,7 +1107,7 @@
     try { await call('rd_sale_delete', { p_id: saleCtx.sale.id }); closeSheet(); toast('Sale removed'); await refreshExt(); } catch (err) { $('#ss-msg').textContent = err.message; }
   });
   $('#alert-list').addEventListener('click', (e) => { const b = e.target.closest('button[data-sold]'); if (!b) return; const a = state.alerts.find((x) => x.id === b.dataset.sold); if (a) { try { need(); openSale(a); } catch (err) { toast(err.message); } } });
-  const soldLine = (a) => { const s = a.id && (saleFor(a.id) || listingFor(a.id)); if (!s) return ''; const r = pnl(+s.price, +s.fee_pct, +s.shipping, +s.cost);
+  const soldLine = (a) => { const us = a.id && unitSaleFor(a.id), s = us ? usRow(us) : a.id && (saleFor(a.id) || listingFor(a.id)); if (!s) return ''; const r = pnl(+s.price, +s.fee_pct, +s.shipping, +s.cost);
     return `<p class="sold-line">Sold ${money(+s.price)} on ${esc(platName(s))}, profit <span class="${cls(r.profit)}">${money(r.profit)}</span></p>`; };
 
   // ---------- watch items: next drop + check timing + buy-in
@@ -1369,7 +1555,7 @@
     const nToday = P.filter((p) => etKey(new Date(p.created_at)) === today).length, nWeek = P.filter((p) => etKey(new Date(p.created_at)) >= monday).length;
     const cs = collectors(), owed = r2(cs.reduce((a, c) => a + c.owed, 0));
     const items = state.status?.items || [], alive = items.filter((i) => i.alive).length, blocked = items.filter((i) => i.status === 'blocked').length, hot = items.filter((i) => i.status === 'in_stock').length;
-    const sold = [...ext.listings.filter((l) => l.status === 'sold'), ...ext.sales]; const profit = r2(sold.reduce((a, x) => a + pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost).profit, 0));
+    const sold = soldRows(); const profit = r2(sold.reduce((a, x) => a + pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost).profit, 0));
     const n = nextUp();
     $('#dash-hero').innerHTML = `<p class="k">Risky Drops · ${esc(etDay.format(now))}</p><p class="h">${hot ? `${hot} in stock now` : `${P.length} item${P.length === 1 ? '' : 's'} logged`}</p>
       ${n ? `<p class="n" data-tick="${esc(n.at)}" data-past="Now">${compact(new Date(n.at) - Date.now())}</p><p class="w">until ${esc(n.title)} · ${esc(etLong(n.at))}</p>` : '<p class="w">No announced drop yet.</p>'}`;
@@ -1408,7 +1594,8 @@
       const m = sessionStorage.getItem('rd-login-msg'); if (m) { $('#login-msg').className = 'msg'; $('#login-msg').textContent = m; sessionStorage.removeItem('rd-login-msg'); }
       $('#boot').classList.add('gone'); setTimeout(() => $('#login-form').username.focus({ preventScroll: true }), 300);
     } else if (MODE === 'friend') {
-      onlyScreen('tab-friend'); $('#updated').textContent = SESSION.name ? 'Signed in as ' + SESSION.name : '';
+      onlyScreen('tab-friend'); { const cc = $('#calc-card'); if (cc && cc.parentElement.id !== 'tab-friend') $('#tab-friend').appendChild(cc); }   // friends have no Settings tab
+      $('#updated').textContent = SESSION.name ? 'Signed in as ' + SESSION.name : '';
       $('#fr-name').value = localStorage.getItem('rd-fr-name') || SESSION.name || '';
       loadFriend().catch((e) => toast(e.message)).finally(() => $('#boot').classList.add('gone'));
       setInterval(() => { if (document.visibilityState === 'visible' && !openSheet && $('#scan-ui').hidden) loadFriend().catch(() => {}); }, 30000);
