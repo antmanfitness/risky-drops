@@ -414,8 +414,9 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .wd { padding: 12px 12px 6px; }
 .wd-top { flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
 .wd-top .t small { font-weight: 500; font-size: 12.5px; margin-left: 4px; }
-.wd-sort { flex: 0 0 auto; }
-.wd-sort button { min-height: 32px; font-size: 12.5px; padding: 0 10px; }
+.wd-sort { flex: 1 1 100%; }
+.wd-top .t { white-space: nowrap; }
+.wd-sort button { white-space: nowrap; min-height: 32px; font-size: 12.5px; padding: 0 10px; }
 .wd-grp { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 10px 2px 2px; }
 .wd-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-top: 0.5px solid var(--hair); background: none; color: var(--text); font: inherit; padding: 10px 2px; cursor: pointer; min-height: 56px; }
 .wd-list .wd-row:first-child, .wd-grp + .wd-row { border-top: 0; }
