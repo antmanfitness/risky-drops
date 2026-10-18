@@ -327,6 +327,8 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .sd-h { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0; }
 .sd-chart-wrap { margin-top: 16px; }
 .sd-chart-head { flex-wrap: wrap; gap: 8px; }
+.sd-chart-head .sd-h { flex: 1 1 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-chart-head .sd-metric { flex: 1 1 100%; min-width: 0; }
 .sd-metric { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .sd-metric button { flex: none; height: 26px; padding: 0 10px; border-radius: 999px; border: 0.5px solid var(--hair); background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .sd-metric button.on { background: rgba(var(--accent-rgb), .14); color: var(--accent-2); border-color: rgba(var(--accent-rgb), .45); }
