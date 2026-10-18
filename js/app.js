@@ -8,6 +8,21 @@
   const etDay = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric' });
   const et = (iso) => iso ? etFmt.format(new Date(iso)) + ' ET' : '';
   const LABEL = { in_stock: 'In stock', sold_out: 'Sold out', scheduled: 'Scheduled', paused: 'Paused', blocked: 'Blocked', error: 'Error', unknown: 'Unknown', starting: 'Starting', running: 'Running' };
+  // ---- Item types: ONE registry. flow 'scanner' = the iPhone box-scan flow; anything else (or an unknown id) = the generic form.
+  // To add a type: append { id, label, one, hint, icon, flow: 'generic', namePh, modelPh, match }. The server accepts any lowercase id.
+  const ICON = { phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>', console: '<rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18" cy="13.5" r="1"/>',
+    other: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>' };
+  const ITEM_TYPES = [
+    { id: 'phone', label: 'Phones', one: 'phone', hint: 'Scan the box label', icon: ICON.phone, flow: 'scanner', match: /\b(iphone|pixel|galaxy)\b/i },
+    { id: 'console', label: 'Consoles', one: 'console', hint: 'PS5, Xbox, Switch…', icon: ICON.console, flow: 'generic', namePh: 'e.g. PS5 Pro', modelPh: 'e.g. CFI-7020', match: /\b(ps5|ps4|playstation|xbox|switch|steam deck|console)\b/i },
+    { id: 'other', label: 'Other', one: 'item', hint: 'Anything else', icon: ICON.other, flow: 'generic', namePh: 'e.g. Beats Pill', modelPh: 'model / variant' },
+  ];
+  const itemType = (id) => ITEM_TYPES.find((t) => t.id === (id || 'phone')) ||
+    { id, label: String(id).replace(/^./, (c) => c.toUpperCase()), one: String(id), hint: '', icon: ICON.other, flow: 'generic', namePh: 'Item name', modelPh: 'model / variant' };
+  const guessType = (name) => (ITEM_TYPES.find((t) => t.match && t.match.test(name || '')) || { id: 'other' }).id;
+  const typeOfSale = (x) => x.item_type || guessType(x.item);
+  const pickerHtml = () => ITEM_TYPES.map((t) => `<button type="button" class="tpick" role="listitem" data-itype="${t.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg><b>${t.label}</b><small>${t.hint}</small></button>`).join('');
+  const typeChip = (p) => `<span class="tchip">${esc(itemType(p.item_type).label.replace(/s$/, ''))}</span>`;
   let state = { status: null, alerts: [], flip: null, filter: 'all', tab: 'home', wsub: 'list', ssub: 'listings' };
 
   const toast = (t) => { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 2600); };
@@ -94,7 +109,7 @@
 
   // ---------- tabs
   // Tabs: Home / Watches (list | alerts | countdowns) / Phones / Sales (listings | sold | comps). Settings = header gear, Ask = floating orb.
-  const LEGACY = { alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
+  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
   function show(tab, sub) {
     if (LEGACY[tab]) [tab, sub] = LEGACY[tab];
     state.tab = tab;
@@ -102,7 +117,7 @@
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     $('#gear').classList.toggle('on', tab === 'settings');
     $('#ask-open').hidden = tab === 'ask';
-    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + tab + (tab === 'friends' && sub ? '/' + sub : ''));
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (tab === 'phones' ? 'items' : tab) + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
     if (sub && tab === 'sales') showSub('s', sub);
     if (tab === 'sales' && typeof renderTracker === 'function' && ext.loaded) setTimeout(renderTracker, 0);
@@ -415,7 +430,7 @@
     if (k === 'listing') openListing(ext.listings.find((l) => l.id === +id));
     else { const s = ext.sales.find((x) => x.alert_id === id); const a = state.alerts.find((x) => x.id === id) || { id, item: s?.item, ts: s?.sold_at }; openSale(a); } });
   // ---------- Sales overview (Stripe-style): range picker drives 3 cards, dotted line chart (+ dashed estimate) and the revenue→net waterfall
-  let sdMetric = 'rev', sdSel = null;
+  let sdMetric = 'rev', sdSel = null, sdType = null;
   const SD_LABEL = { rev: 'Revenue', profit: 'Net profit', fee: 'Fees', cost: 'Cost', ship: 'Shipping' };
   const soldRows = () => [...ext.listings.filter((l) => l.status === 'sold').map((l) => ({ ...l, when: l.sold_at || l.updated_at })), ...ext.sales.map((x) => ({ ...x, when: x.sold_at }))].filter((x) => x.when);
   const dayLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
@@ -424,10 +439,13 @@
   function renderTracker() {
     if (!$('#sd-cards')) return;
     const today = etKey(new Date()), from = trackerPeriod === 'all' ? '' : addDays(today, -(+trackerPeriod - 1));
-    const all = soldRows(), rows = all.filter((x) => etKey(new Date(x.when)) >= from);
+    const allT = soldRows(), present = [...new Set(allT.map(typeOfSale))];
+    $('#sd-types').innerHTML = present.length ? [`<button type="button" class="spill ${sdType === null ? 'on' : ''}" data-stype="">All types</button>`, ...[...ITEM_TYPES.map((t) => t.id).filter((id) => present.includes(id)), ...present.filter((id) => !ITEM_TYPES.some((t) => t.id === id))]
+      .map((id) => `<button type="button" class="spill ${sdType === id ? 'on' : ''}" data-stype="${esc(id)}">${esc(itemType(id).label)}</button>`)].join('') : '';
+    const all = allT.filter((x) => sdType === null || typeOfSale(x) === sdType), rows = all.filter((x) => etKey(new Date(x.when)) >= from);
     const t = rows.reduce((a, x) => { const r = pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost); a.rev += +x.price; a.fee += r.fee; a.ship += +x.shipping; a.cost += +x.cost; a.profit += r.profit; return a; }, { rev: 0, fee: 0, ship: 0, cost: 0, profit: 0 });
     Object.keys(t).forEach((k) => (t[k] = r2(t[k])));
-    const active = ext.listings.filter((l) => l.status === 'active'), unsoldCost = r2(active.reduce((a, l) => a + +l.cost, 0));
+    const active = ext.listings.filter((l) => l.status === 'active' && (sdType === null || typeOfSale(l) === sdType)), unsoldCost = r2(active.reduce((a, l) => a + +l.cost, 0));
     const n = rows.length, rangeTxt = trackerPeriod === 'all' ? 'all time' : `last ${trackerPeriod} days`;
     $('#sd-cards').innerHTML = `<div class="sd-card"><small>Money invested</small><b>${money(t.cost)}</b><span>item cost of ${n} sale${n === 1 ? '' : 's'}${active.length ? ` · +${money(unsoldCost)} in ${active.length} unsold` : ''}</span></div>
       <div class="sd-card"><small>Money made</small><b>${money(t.rev)}</b><span>net profit <b class="${cls(t.profit)}" style="display:inline;font-size:inherit">${money(t.profit)}</b></span></div>
@@ -437,7 +455,7 @@
     for (const x of rows) { const k = etKey(new Date(x.when)), r = pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost), d = byDay.get(k) || { k, n: 0, rev: 0, fee: 0, cost: 0, ship: 0, profit: 0 };
       d.n++; d.rev += +x.price; d.fee += r.fee; d.cost += +x.cost; d.ship += +x.shipping; d.profit += r.profit; byDay.set(k, d); }
     const pts = [...byDay.values()].sort((a, b) => a.k.localeCompare(b.k)).map((d) => ({ ...d, rev: r2(d.rev), fee: r2(d.fee), cost: r2(d.cost), ship: r2(d.ship), profit: r2(d.profit) }));
-    $('#sd-chart-title').textContent = `${SD_LABEL[sdMetric]} over time · ${rangeTxt}`;
+    $('#sd-chart-title').textContent = `${SD_LABEL[sdMetric]} over time · ${sdType ? itemType(sdType).label.toLowerCase() + ' · ' : ''}${rangeTxt}`;
     renderChart(pts, projection(all, active, today));
     // waterfall: revenue − fees − cost − shipping = net profit
     if (!n) { $('#sd-break').innerHTML = `<p class="sd-empty">No sales in this range yet. Mark a listing or alert sold and it shows up here.</p>`; return; }
@@ -502,17 +520,25 @@
   }
   const short$ = (v) => { const a = Math.abs(v), sg = v < 0 ? '−' : ''; return sg + '$' + (a >= 10000 ? (a / 1000).toFixed(0) + 'k' : a >= 1000 ? (a / 1000).toFixed(1) + 'k' : a.toFixed(0)); };
   $('#tracker-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; trackerPeriod = b.dataset.p; document.querySelectorAll('#tracker-seg button').forEach((x) => x.classList.toggle('on', x === b)); renderTracker(); });
+  $('#sd-types').addEventListener('click', (e) => { const b = e.target.closest('[data-stype]'); if (!b) return; sdType = b.dataset.stype || null; renderTracker(); });
   $('#sd-metric').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; sdMetric = b.dataset.m; document.querySelectorAll('#sd-metric button').forEach((x) => x.classList.toggle('on', x === b)); renderTracker(); });
   const setStatus = (s) => document.querySelectorAll('#sl-status button').forEach((b) => b.classList.toggle('on', b.dataset.s === s));
   const curStatus = () => $('#sl-status button.on').dataset.s;
   $('#sl-status').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { setStatus(b.dataset.s); } });
   function listingCalc() { const f = $('#listing-form'); $('#sl-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), num(f.cost.value)); }
+  const typeOpts = (sel) => { sel.innerHTML = ITEM_TYPES.map((t) => `<option value="${t.id}">${esc(t.label.replace(/s$/, ''))}</option>`).join(''); };
+  typeOpts($('#listing-form').item_type); typeOpts($('#sale-form').item_type);
+  $('#listing-form').item.addEventListener('input', (e) => { const f = e.target.form; if (!f.item_type.dataset.touched) f.item_type.value = guessType(e.target.value); });
+  $('#sale-form').item.addEventListener('input', (e) => { const f = e.target.form; if (!f.item_type.dataset.touched) f.item_type.value = guessType(e.target.value); });
+  ['#listing-form', '#sale-form'].forEach((id) => $(id).item_type.addEventListener('change', (e) => { e.target.dataset.touched = '1'; }));
+  const tagType = (kind, id, t) => id ? call('rd_set_item_type', { p_kind: kind, p_id: id, p_type: t }).catch((x) => toast('Type not saved: ' + x.message)) : null;
   function openListing(l, sold) {
-    listingEdit = l || null; const f = $('#listing-form'); f.reset();
+    listingEdit = l || null; const f = $('#listing-form'); f.reset(); delete f.item_type.dataset.touched;
     $('#sl-title').textContent = l ? 'Edit listing' : 'New listing';
     f.item.value = l ? l.item : ''; f.platform.value = l ? l.platform : ''; f.platform_custom.value = l ? (l.platform_custom || '') : '';
     f.fee_pct.value = l ? pct(+l.fee_pct) : ''; f.cost.value = l ? (+l.cost).toFixed(2) : ''; f.price.value = l ? (+l.price).toFixed(2) : '';
     f.shipping.value = l && +l.shipping ? (+l.shipping).toFixed(2) : ''; f.notes.value = l ? (l.notes || '') : '';
+    f.item_type.value = l ? typeOfSale(l) : 'other';
     setStatus(sold ? 'sold' : l ? l.status : 'active');
     const p = l && priceRow('listing', l.id); f.drop_alert.checked = !!(p && p.alert_on);
     $('#sl-price').innerHTML = (p && p.market_value != null) ? priceLine(p, +l.cost) : 'Uses your cost paid as the buy-in. No price source yet, so nothing is checked until one is added.';
@@ -531,6 +557,7 @@
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
     try {
       const l = listingEdit ? await call('rd_listing_update', { p_id: listingEdit.id, p_listing: body }) : await call('rd_listing_add', { p_listing: body });
+      await tagType('listing', l.id, f.item_type.value);
       const prev = priceRow('listing', l.id);
       if (f.drop_alert.checked || prev) await call('rd_price_watch_save', { p_kind: 'listing', p_ref: String(l.id), p_cfg: { buy_in: l.cost, alert_on: f.drop_alert.checked, label: l.item, site: platName(l), member_id: me()?.id ?? null } });
       closeSheet(); toast(listingEdit ? 'Listing updated' : 'Listing added'); await refreshExt();
@@ -577,10 +604,10 @@
   const linkToggle = () => { const f = $('#sale-form'), on = !!(saleCtx.listing && f.use_listing.checked); $('#ss-cost-wrap').hidden = on; saleCalc(); };
   function openSale(a) {
     const linked = listingFor(a.id); if (linked) { openListing(linked); return; }   // already one record: edit the listing itself
-    const s = saleFor(a.id), L = s ? null : matchListing(a.item || a.title), f = $('#sale-form'); f.reset();
+    const s = saleFor(a.id), L = s ? null : matchListing(a.item || a.title), f = $('#sale-form'); f.reset(); delete f.item_type.dataset.touched;
     saleCtx = { alert: a, sale: s, listing: L, feeTouched: !!s };
     $('#ss-title').textContent = s ? 'Edit sale' : 'Mark as sold'; $('#ss-sub').textContent = `${a.store ? a.store + ' · ' : ''}${a.time_et || et(a.ts)}`;
-    f.item.value = s ? s.item : (a.item || a.title || ''); f.price.value = s ? (+s.price).toFixed(2) : (L ? (+L.price).toFixed(2) : '');
+    f.item.value = s ? s.item : (a.item || a.title || ''); f.item_type.value = s ? typeOfSale(s) : L ? typeOfSale(L) : guessType(f.item.value); f.price.value = s ? (+s.price).toFixed(2) : (L ? (+L.price).toFixed(2) : '');
     f.platform.value = s ? s.platform : (L ? L.platform : ''); f.platform_custom.value = s ? (s.platform_custom || '') : (L ? (L.platform_custom || '') : '');
     f.cost.value = s ? (+s.cost).toFixed(2) : (L ? (+L.cost).toFixed(2) : ''); f.shipping.value = s && +s.shipping ? (+s.shipping).toFixed(2) : (L && +L.shipping ? (+L.shipping).toFixed(2) : '');
     if (s) { f.fee_pct.value = pct(+s.fee_pct); $('#ss-feehint').textContent = 'Fee % you entered for this sale. Platforms set individual rates.'; } else saleFee(true);
@@ -598,8 +625,8 @@
     try {
       const L = saleCtx.listing && f.use_listing.checked ? saleCtx.listing : null;
       if (L) { await call('rd_listing_update', { p_id: L.id, p_listing: { item: L.item, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, cost: +L.cost, price, shipping: ship, notes: L.notes, status: 'sold' } });
-        await call('rd_listing_link_alert', { p_id: L.id, p_alert_id: saleCtx.alert.id }); }
-      else await call('rd_sale_save', { p_sale: { alert_id: saleCtx.alert.id, item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, price, cost, shipping: ship } });
+        await call('rd_listing_link_alert', { p_id: L.id, p_alert_id: saleCtx.alert.id }); await tagType('listing', L.id, f.item_type.value); }
+      else { const sv = await call('rd_sale_save', { p_sale: { alert_id: saleCtx.alert.id, item: f.item.value, platform: f.platform.value, platform_custom: f.platform_custom.value, fee_pct: fee, price, cost, shipping: ship } }); await tagType('sale', sv && sv.id, f.item_type.value); }
       closeSheet(); toast('Sale saved'); await refreshExt(); } catch (err2) { msg.textContent = err2.message; }
   });
   $('#ss-delete').addEventListener('click', async () => {
@@ -831,11 +858,14 @@
   $('#ask-open').addEventListener('click', () => { show('ask'); loadAsk().catch((e) => toast(e.message)); setTimeout(() => $('#ask-q').focus({ preventScroll: true }), 50); });
 
   // ================= Phones: box scanner, phone log, collectors & payouts, part lookup =================
-  const ph = { phones: [], parts: [], dupes: [], loaded: false, filter: null, q: '' };
+  const ph = { phones: [], parts: [], dupes: [], loaded: false, filter: null, q: '', type: null };
   async function loadPhones() { if (TOKEN) return loadFriend(); if (!CFG || !KEY) return; const d = await rpc('rd_phones', { p_key: KEY }); Object.assign(ph, d, { loaded: true }); renderPhones(); renderDash(); }
   const C = window.RDClassify;
   const maskSerial = (s) => s ? s.slice(0, 3) + '•••' + s.slice(-2) : '';
-  const phoneName = (p) => [p.model, p.color, p.storage].filter(Boolean).join(' · ') || (p.part_number ? p.part_number : 'Unknown model');
+  const phoneName = (p) => (p.item_type && p.item_type !== 'phone') ? ([p.item_name, p.model].filter(Boolean).join(' · ') || 'Unnamed item') :
+    ([p.model, p.color, p.storage].filter(Boolean).join(' · ') || (p.part_number ? p.part_number : 'Unknown model'));
+  const openAny = (p) => p && p.item_type && p.item_type !== 'phone' ? openItem(p, p.item_type) : openPhone(p);
+  function startItem(id) { const t = itemType(id); if (t.flow === 'scanner') openScanner(); else openItem(null, t.id); }
   const hwMismatch = (p) => p.handwritten_serial && p.serial && p.handwritten_serial.replace(/[^A-Z0-9]/gi, '').toUpperCase() !== p.serial;
   const partOf = (pn) => ph.parts.find((x) => x.part_number === String(pn || '').toUpperCase());
   function collectors() {
@@ -845,15 +875,17 @@
   }
   function renderPhones() {
     const cs = collectors(), total = r2(cs.reduce((a, c) => a + c.owed, 0));
-    $('#collectors').innerHTML = cs.length ? `<div class="stats" style="margin-top:0"><div class="wide"><small>Owed back to collectors · ${cs.reduce((a, c) => a + c.n, 0)} phones</small><b>${money(total)}</b></div></div>
-      <div class="coll-list">${cs.map((c) => `<button class="coll ${ph.filter === c.id ? 'on' : ''}" data-coll="${c.id ?? ''}"><span class="grow"><b>${esc(c.name)}</b><small>${c.n} phone${c.n === 1 ? '' : 's'}</small></span><b>${money(c.owed)}</b></button>`).join('')}</div>
-      <p class="f">Owed = sum of price paid on each collector’s logged phones (their money back). Profit split comes later.</p>` : '<p class="d">No phones logged yet. Tap Scan box.</p>';
+    $('#collectors').innerHTML = cs.length ? `<div class="stats" style="margin-top:0"><div class="wide"><small>Owed back to collectors · ${cs.reduce((a, c) => a + c.n, 0)} items</small><b>${money(total)}</b></div></div>
+      <div class="coll-list">${cs.map((c) => `<button class="coll ${ph.filter === c.id ? 'on' : ''}" data-coll="${c.id ?? ''}"><span class="grow"><b>${esc(c.name)}</b><small>${c.n} item${c.n === 1 ? '' : 's'}</small></span><b>${money(c.owed)}</b></button>`).join('')}</div>
+      <p class="f">Owed = sum of price paid on each collector’s logged items (their money back). Profit split comes later.</p>` : '<p class="d">Nothing logged yet. Pick a type above.</p>';
     $('#ph-filter-clear').hidden = ph.filter === null;
     const q = ph.q.trim().toUpperCase();
-    const rows = ph.phones.filter((p) => (ph.filter === null || p.member_id === ph.filter) && (!q || [p.serial, p.imei1, p.imei2, p.model, p.color, p.storage, p.part_number, p.member, p.sku].some((x) => String(x || '').toUpperCase().includes(q))));
+    const present = [...new Set(ph.phones.map((p) => p.item_type || 'phone'))], types = [...ITEM_TYPES.map((t) => t.id).filter((id) => present.includes(id)), ...present.filter((id) => !ITEM_TYPES.some((t) => t.id === id))];
+    $('#ph-types').innerHTML = types.length > 1 ? [`<button type="button" class="spill ${ph.type === null ? 'on' : ''}" data-ptype="">All ${ph.phones.length}</button>`, ...types.map((id) => `<button type="button" class="spill ${ph.type === id ? 'on' : ''}" data-ptype="${esc(id)}">${esc(itemType(id).label)} ${ph.phones.filter((p) => (p.item_type || 'phone') === id).length}</button>`)].join('') : '';
+    const rows = ph.phones.filter((p) => (ph.filter === null || p.member_id === ph.filter) && (ph.type === null || (p.item_type || 'phone') === ph.type) && (!q || [p.serial, p.imei1, p.imei2, p.model, p.color, p.storage, p.part_number, p.member, p.sku, p.item_name, p.order_number].some((x) => String(x || '').toUpperCase().includes(q))));
     $('#phone-list').innerHTML = rows.map((p) => `<button class="card qrow" data-phone="${p.id}">
-      <div class="row"><p class="t grow">${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
-      <p class="d">S/N ${esc(p.serial)}${p.imei1 ? ' · IMEI ' + esc(p.imei1) : ''}${p.imei2 ? ' / ' + esc(p.imei2) : ''}</p>
+      <div class="row"><p class="t grow">${typeChip(p)}${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
+      <p class="d">${p.serial ? 'S/N ' + esc(p.serial) : 'No serial'}${p.imei1 ? ' · IMEI ' + esc(p.imei1) : ''}${p.imei2 ? ' / ' + esc(p.imei2) : ''}${p.order_number ? ' · Order ' + esc(p.order_number) : ''}</p>
       <p class="f">${esc(p.member || 'No collector')} · ${esc(et(p.created_at))}${p.part_number ? ' · ' + esc(p.part_number) : ''}${p.status === 'returned' ? ' · returned' : ''}${p.has_photo ? ' · 📷' : ''}</p>
       ${hwMismatch(p) ? `<p class="flag">Handwritten serial “${esc(p.handwritten_serial)}” doesn’t match the scanned serial</p>` : ''}</button>`).join('') || `<p class="empty">${ph.phones.length ? 'No matches.' : 'Nothing logged yet.'}</p>`;
     $('#parts-count').textContent = ph.parts.length;
@@ -866,7 +898,10 @@
   $('#collectors').addEventListener('click', (e) => { const b = e.target.closest('[data-coll]'); if (!b) return; const id = b.dataset.coll === '' ? null : +b.dataset.coll; ph.filter = ph.filter === id ? null : id; renderPhones(); });
   $('#ph-filter-clear').addEventListener('click', () => { ph.filter = null; renderPhones(); });
   $('#ph-search').addEventListener('input', (e) => { ph.q = e.target.value; renderPhones(); });
-  $('#phone-list').addEventListener('click', (e) => { const b = e.target.closest('[data-phone]'); if (b) openPhone(ph.phones.find((p) => p.id === +b.dataset.phone)); });
+  $('#phone-list').addEventListener('click', (e) => { const b = e.target.closest('[data-phone]'); if (b) openAny(ph.phones.find((p) => p.id === +b.dataset.phone)); });
+  $('#item-pick').innerHTML = pickerHtml(); $('#fr-pick').innerHTML = pickerHtml();
+  $('#item-pick').addEventListener('click', (e) => { const b = e.target.closest('[data-itype]'); if (b) startItem(b.dataset.itype); });
+  $('#ph-types').addEventListener('click', (e) => { const b = e.target.closest('[data-ptype]'); if (!b) return; ph.type = b.dataset.ptype || null; renderPhones(); });
   $('#parts-list').addEventListener('click', async (e) => { const b = e.target.closest('[data-pdel]'); if (!b || !confirm(`Remove ${b.dataset.pdel} from the lookup?`)) return;
     try { await call('rd_part_delete', { p_part: b.dataset.pdel }); await loadPhones(); toast('Removed'); } catch (err) { toast(err.message); } });
 
@@ -898,7 +933,6 @@
       onStatus: (st, m) => { if (st === 'scanning') renderCap(); else { $('#scan-view').hidden = true; $('#scan-msg').textContent = m; } } });
   }
   function closeScanner() { stopLive?.(); stopLive = null; torchFn = null; $('#scan-ui').hidden = true; document.body.style.overflow = ''; }
-  $('#scan-open').addEventListener('click', openScanner);
   $('#scan-cancel').addEventListener('click', () => { if (!Object.values(cap).some(Boolean) || confirm('Discard what you scanned?')) closeScanner(); });
   $('#scan-torch').addEventListener('click', async () => { if (torchFn && await torchFn(!torchOn)) { torchOn = !torchOn; $('#scan-torch').textContent = torchOn ? 'Light off' : 'Light on'; } else $('#scan-torch').hidden = true; });
   $('#scan-file').addEventListener('change', async (e) => {
@@ -984,7 +1018,7 @@
     if (err) { msg.textContent = err; return; }
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
     try {
-      const body = { member_id: f.member_id.value, serial, imei1: i1, imei2: i2, part_number: f.part_number.value, model: f.model.value, color: f.color.value,
+      const body = { item_type: 'phone', member_id: f.member_id.value, serial, imei1: i1, imei2: i2, part_number: f.part_number.value, model: f.model.value, color: f.color.value,
         storage: f.storage.value, sku: f.sku.value, handwritten_serial: f.handwritten_serial.value, price_paid: price, notes: f.notes.value, order_number: f.order_number.value,
         status: phEdit ? $('#sp-status button.on').dataset.s : 'logged', photo: phPhoto };
       if (TOKEN) { if (!f.entered_name.value.trim()) { msg.className = 'msg err'; msg.textContent = 'Enter your name.'; btn.disabled = false; return; } body.entered_name = f.entered_name.value.trim(); delete body.member_id; delete body.status; }
@@ -1000,6 +1034,46 @@
     try { await call('rd_phone_delete', { p_id: phEdit.id }); closeSheet(); toast('Deleted'); await loadPhones(); } catch (err) { $('#sp-msg').textContent = err.message; } });
   setInterval(() => { if (document.visibilityState === 'visible' && (state.tab === 'phones' || state.tab === 'home') && !openSheet && $('#scan-ui').hidden) loadPhones().catch(() => {}); }, 10000);
 
+  // ---------- generic item sheet (consoles, other, and any future registry type without a custom flow)
+  let itEdit = null, itType = 'other', itPhoto = null;
+  const setItStatus = (v) => document.querySelectorAll('#si-status button').forEach((b) => b.classList.toggle('on', b.dataset.s === v));
+  $('#si-status').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setItStatus(b.dataset.s); });
+  function openItem(p, type) {
+    try { need(); } catch (err) { toast(err.message); return; }
+    itEdit = p || null; itType = (p && p.item_type) || type || 'other'; itPhoto = null; const t = itemType(itType), f = $('#item-form'); f.reset();
+    f.member_id.innerHTML = ext.members.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
+    f.member_id.value = String(p ? (p.member_id ?? '') : (me()?.id ?? ''));
+    $('#si-coll-wrap').hidden = !!TOKEN; $('#si-name-wrap').hidden = !TOKEN; f.entered_name.value = TOKEN ? ($('#fr-name').value.trim() || fr.account?.name || '') : '';
+    $('#si-title').textContent = (p ? 'Edit ' : 'New ') + t.one; $('#si-sub').textContent = p ? `Logged ${et(p.created_at)} by ${p.member || 'no collector'}` : 'Check every field before saving.';
+    f.item_name.placeholder = t.namePh || 'Item name'; f.model.placeholder = t.modelPh || 'optional';
+    for (const k of ['item_name', 'model', 'serial', 'order_number', 'receipt_url', 'notes']) f[k].value = p ? (p[k] || '') : '';
+    f.price_paid.value = p ? (+p.price_paid).toFixed(2) : '';
+    $('#si-thumb').hidden = true; $('#si-status-wrap').hidden = !p; setItStatus(p ? p.status : 'logged');
+    if (p?.has_photo) call('rd_phone_photo', { p_id: p.id }).then((d) => { if (d) { $('#si-thumb').src = d; $('#si-thumb').hidden = false; } }).catch(() => {});
+    $('#si-delete').hidden = !p || !!TOKEN; $('#si-msg').textContent = ''; sheet('#sheet-item'); setTimeout(() => f.item_name.focus({ preventScroll: true }), 60);
+  }
+  $('#item-form').photo.addEventListener('change', async (e) => { const fl = e.target.files[0]; if (!fl) return; try { itPhoto = await RDScanner.compress(fl, 1280, 0.72); $('#si-thumb').src = itPhoto; $('#si-thumb').hidden = false; } catch (err) { toast(err.message); } });
+  $('#item-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target, msg = $('#si-msg'); msg.className = 'msg err';
+    const price = num(f.price_paid.value), serial = f.serial.value.replace(/[^A-Za-z0-9-]/g, '').toUpperCase(), url = f.receipt_url.value.trim();
+    const err = !f.item_name.value.trim() ? 'Enter a name.' : (serial && !/^[A-Z0-9-]{3,40}$/.test(serial)) ? 'Serial: 3–40 letters/numbers.' : (!isFinite(price) || price < 0) ? 'Enter the price paid.' :
+      (url && !/^https?:\/\/\S+$/i.test(url)) ? 'Receipt link must start with http:// or https://' : (TOKEN && !f.entered_name.value.trim()) ? 'Enter your name.' : '';
+    if (err) { msg.textContent = err; return; }
+    const body = { item_type: itType, item_name: f.item_name.value.trim(), model: f.model.value, serial, order_number: f.order_number.value, price_paid: price, receipt_url: url, notes: f.notes.value,
+      photo: itPhoto, member_id: f.member_id.value, status: itEdit ? $('#si-status button.on').dataset.s : 'logged' };
+    if (TOKEN) { body.entered_name = f.entered_name.value.trim(); delete body.member_id; delete body.status; }
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
+    try {
+      const r = await call('rd_phone_save', { p_id: itEdit ? itEdit.id : null, p_phone: body });
+      if (r && r.error) { msg.className = 'msg err'; msg.textContent = r.error; btn.disabled = false; return; }
+      closeSheet(); toast(itEdit ? 'Item updated' : `${itemType(itType).one.replace(/^./, (c) => c.toUpperCase())} logged`); await loadPhones();
+      if (!TOKEN && state.tab === 'friends') loadFriendsView().catch(() => {});
+    } catch (err2) { msg.className = 'msg err'; msg.textContent = err2.message; }
+    btn.disabled = false;
+  });
+  $('#si-delete').addEventListener('click', async () => { if (!itEdit || !confirm(`Delete ${phoneName(itEdit)}? This can’t be undone.`)) return;
+    try { await call('rd_phone_delete', { p_id: itEdit.id }); closeSheet(); toast('Deleted'); await loadPhones(); if (state.tab === 'friends') loadFriendsView().catch(() => {}); } catch (err) { $('#si-msg').textContent = err.message; } });
+
   // ================= Dashboard (read-only overview; every card links to the tab that owns it) =================
   function renderDash() {
     if (!$('#dash-stats')) return;
@@ -1010,10 +1084,10 @@
     const items = state.status?.items || [], alive = items.filter((i) => i.alive).length, blocked = items.filter((i) => i.status === 'blocked').length, hot = items.filter((i) => i.status === 'in_stock').length;
     const sold = [...ext.listings.filter((l) => l.status === 'sold'), ...ext.sales]; const profit = r2(sold.reduce((a, x) => a + pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost).profit, 0));
     const n = nextUp();
-    $('#dash-hero').innerHTML = `<p class="k">Risky Drops · ${esc(etDay.format(now))}</p><p class="h">${hot ? `${hot} in stock now` : `${P.length} phone${P.length === 1 ? '' : 's'} logged`}</p>
+    $('#dash-hero').innerHTML = `<p class="k">Risky Drops · ${esc(etDay.format(now))}</p><p class="h">${hot ? `${hot} in stock now` : `${P.length} item${P.length === 1 ? '' : 's'} logged`}</p>
       ${n ? `<p class="n" data-tick="${esc(n.at)}" data-past="Now">${compact(new Date(n.at) - Date.now())}</p><p class="w">until ${esc(n.title)} · ${esc(etLong(n.at))}</p>` : '<p class="w">No announced drop yet.</p>'}`;
     const stat = (go, label, val, sub, c = '') => `<button class="dstat" data-go="${go}"><small>${label}</small><b class="${c}">${val}</b>${sub ? `<span>${sub}</span>` : ''}</button>`;
-    $('#dash-stats').innerHTML = stat('phones', 'Phones logged', P.length, `${nToday} today · ${nWeek} this week`) + stat('phones', 'Owed to collectors', money(owed), `${cs.length} collector${cs.length === 1 ? '' : 's'}`) +
+    $('#dash-stats').innerHTML = stat('phones', 'Items logged', P.length, `${nToday} today · ${nWeek} this week`) + stat('phones', 'Owed to collectors', money(owed), `${cs.length} collector${cs.length === 1 ? '' : 's'}`) +
       stat('watches/list', 'Watchers', `${alive}/${items.length}`, `${blocked} blocked${hot ? ` · <span class="neg">${hot} in stock</span>` : ''}`) + stat('sales/sold', 'Sales profit', money(profit), `${sold.length} sale${sold.length === 1 ? '' : 's'}`, cls(profit));
     // breakdown by model / color / storage
     const groups = new Map(); for (const p of logged) { const k = phoneName(p); groups.set(k, (groups.get(k) || 0) + 1); }
@@ -1024,8 +1098,8 @@
     const card = (go, title, body, more = 'Open') => `<div class="card dcard"><div class="row"><p class="t grow">${title}</p><button class="btn ghost" data-go="${go}">${more} ›</button></div>${body}</div>`;
     $('#dash-cards').innerHTML =
       card('phones', 'Payout owed by collector', cs.length ? `<div class="coll-list">${cs.slice(0, 5).map((c) => `<button class="coll" data-gocoll="${c.id ?? ''}"><span class="grow"><b>${esc(c.name)}</b><small>${c.n} phone${c.n === 1 ? '' : 's'}</small></span><b>${money(c.owed)}</b></button>`).join('')}</div>` : '<p class="d">No collectors have logged phones yet.</p>') +
-      card('phones', 'Phones by model', breakdown.length ? `<div class="bars">${breakdown.map(([k, v]) => `<div><span>${esc(k)}</span><i style="--w:${Math.round(v / breakdown[0][1] * 100)}%"></i><b>${v}</b></div>`).join('')}</div>` : '<p class="d">Nothing logged yet.</p>') +
-      card('phones', 'Recent phones', P.length ? P.slice(0, 5).map((p) => `<div class="drow"><span class="grow"><b>${esc(phoneName(p))}</b><small>${esc(maskSerial(p.serial))} · ${esc(p.member || 'No collector')} · ${esc(et(p.created_at))}</small></span><b>${money(+p.price_paid)}</b></div>`).join('') : '<p class="d">Nothing logged yet.</p>') +
+      card('phones', 'Items by model', breakdown.length ? `<div class="bars">${breakdown.map(([k, v]) => `<div><span>${esc(k)}</span><i style="--w:${Math.round(v / breakdown[0][1] * 100)}%"></i><b>${v}</b></div>`).join('')}</div>` : '<p class="d">Nothing logged yet.</p>') +
+      card('phones', 'Recent items', P.length ? P.slice(0, 5).map((p) => `<div class="drow"><span class="grow"><b>${esc(phoneName(p))}</b><small>${esc(maskSerial(p.serial))} · ${esc(p.member || 'No collector')} · ${esc(et(p.created_at))}</small></span><b>${money(+p.price_paid)}</b></div>`).join('') : '<p class="d">Nothing logged yet.</p>') +
       card('phones', `Flags${flags.length ? ` <span class="pill price_drop">${flags.length}</span>` : ''}`, flags.length ? flags.slice(0, 6).map((x) => `<div class="drow flagrow"><span class="grow"><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></div>`).join('') : '<p class="d">No duplicate or mismatch flags.</p>', 'Review') +
       card('watches/alerts', 'Latest restock alerts', restocks.length ? restocks.map((a) => `<div class="drow"><span class="grow"><b>${esc(a.item || a.title)}</b><small>${esc([a.store, a.city].filter(Boolean).join(', '))} · ${esc(a.time_et || et(a.ts))}</small></span></div>`).join('') : '<p class="d">No restocks yet.</p>') +
       card('watches/list', 'Watcher health', `<div class="drow"><span class="grow">${items.map((i) => `<span class="hchip"><span class="dot ${i.alive ? 'on' : i.status === 'scheduled' || i.paused ? '' : 'off'}"></span>${esc(i.name.split(' (')[0])}${i.status === 'blocked' ? ' · blocked' : i.status === 'in_stock' ? ' · IN STOCK' : ''}</span>`).join('')}</span></div>`);
@@ -1073,21 +1147,21 @@
   function renderFriend() {
     const name = fr.account?.name || SESSION?.name || '';
     const logged = fr.phones.filter((p) => p.status === 'logged'), owed = r2(logged.reduce((a, p) => a + +p.price_paid, 0));
-    $('#fr-hero').innerHTML = `<p class="k">Risky Drops · friend account</p><p class="h">Hi ${esc(name)}</p><p class="w">@${esc(fr.account?.username || '')} · ${fr.phones.length} phone${fr.phones.length === 1 ? '' : 's'} uploaded</p>`;
-    $('#fr-stats').innerHTML = `<div class="wide"><small>Payout owed to you · ${logged.length} phone${logged.length === 1 ? '' : 's'}</small><b>${money(owed)}</b></div>
-      <div><small>Phones uploaded</small><b>${fr.phones.length}</b></div><div><small>Receipts</small><b>${fr.receipts.length}</b></div>`;
-    $('#fr-phones').innerHTML = fr.phones.map((p) => `<div class="card"><div class="row"><p class="t grow">${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
-      <p class="d">S/N ${esc(p.serial)}${p.imei1 ? ' · IMEI ' + esc(p.imei1) : ''}${p.order_number ? ' · Order ' + esc(p.order_number) : ''}</p>
-      <p class="f">${esc(et(p.created_at))}${p.status === 'returned' ? ' · returned' : ' · logged'}${p.has_photo ? ' · 📷' : ''}</p></div>`).join('') || '<p class="empty">Nothing uploaded yet. Tap Scan box.</p>';
+    $('#fr-hero').innerHTML = `<p class="k">Risky Drops · friend account</p><p class="h">Hi ${esc(name)}</p><p class="w">@${esc(fr.account?.username || '')} · ${fr.phones.length} item${fr.phones.length === 1 ? '' : 's'} uploaded</p>`;
+    $('#fr-stats').innerHTML = `<div class="wide"><small>Payout owed to you · ${logged.length} item${logged.length === 1 ? '' : 's'}</small><b>${money(owed)}</b></div>
+      <div><small>Items uploaded</small><b>${fr.phones.length}</b></div><div><small>Receipts</small><b>${fr.receipts.length}</b></div>`;
+    $('#fr-phones').innerHTML = fr.phones.map((p) => `<div class="card"><div class="row"><p class="t grow">${typeChip(p)}${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
+      <p class="d">${p.serial ? 'S/N ' + esc(p.serial) : 'No serial'}${p.imei1 ? ' · IMEI ' + esc(p.imei1) : ''}${p.order_number ? ' · Order ' + esc(p.order_number) : ''}</p>
+      <p class="f">${esc(et(p.created_at))}${p.status === 'returned' ? ' · returned' : ' · logged'}${p.has_photo ? ' · 📷' : ''}</p></div>`).join('') || '<p class="empty">Nothing uploaded yet. Pick a type above.</p>';
     $('#fr-receipts').innerHTML = fr.receipts.length ? `<div class="card">${fr.receipts.map((x) => `<div class="rc-row"><span class="grow"><b>${esc(x.file_name || (x.mime === 'application/pdf' ? 'Receipt (PDF)' : 'Receipt photo'))}</b><small>${esc(et(x.created_at))}${x.order_number ? ' · Order ' + esc(x.order_number) : ''}${x.phone_id ? ' · ' + esc(phoneName(fr.phones.find((p) => p.id === x.phone_id) || {})) : ''} · ${fmtBytes(x.size_bytes)}</small></span><button class="btn" data-rview="${x.id}">View</button><button class="btn ghost danger" data-rdel="${x.id}" aria-label="Delete receipt">✕</button></div>`).join('')}</div>` : '<p class="empty">No receipts yet.</p>';
     const sel = $('#rc-form').phone_id, cur = sel.value;
-    sel.innerHTML = '<option value="">Not linked</option>' + fr.phones.map((p) => `<option value="${p.id}">${esc(phoneName(p))} · ${esc(p.serial.slice(-5))}</option>`).join(''); sel.value = cur;
+    sel.innerHTML = '<option value="">Not linked</option>' + fr.phones.map((p) => `<option value="${p.id}">${esc(phoneName(p))}${p.serial ? ' · ' + esc(p.serial.slice(-5)) : ''}</option>`).join(''); sel.value = cur;
     const uniq = (k) => [...new Set([...ph.parts.map((x) => x[k]), ...ph.phones.map((x) => x[k])].filter(Boolean))].sort();
     $('#dl-model').innerHTML = uniq('model').map((v) => `<option value="${esc(v)}">`).join(''); $('#dl-color').innerHTML = uniq('color').map((v) => `<option value="${esc(v)}">`).join('');
     $('#dl-storage').innerHTML = [...new Set([...uniq('storage'), '128GB', '256GB', '512GB', '1TB', '2TB'])].map((v) => `<option value="${esc(v)}">`).join('');
   }
   $('#fr-name').addEventListener('change', (e) => localStorage.setItem('rd-fr-name', e.target.value.trim()));
-  $('#fr-scan').addEventListener('click', () => { if (!$('#fr-name').value.trim()) { toast('Enter your name first'); $('#fr-name').focus(); return; } localStorage.setItem('rd-fr-name', $('#fr-name').value.trim()); openScanner(); });
+  $('#fr-pick').addEventListener('click', (e) => { const b = e.target.closest('[data-itype]'); if (!b) return; if (!$('#fr-name').value.trim()) { toast('Enter your name first'); $('#fr-name').focus(); return; } localStorage.setItem('rd-fr-name', $('#fr-name').value.trim()); startItem(b.dataset.itype); });
   $('#fr-logout').addEventListener('click', () => { if (confirm('Log out of Risky Drops on this device?')) signOut('Logged out.'); });
   let rcFile = null;
   const readAsDataUrl = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read that file')); r.readAsDataURL(f); });
@@ -1142,9 +1216,9 @@
     const list = flFilter === 'active' ? act : dis;
     $('#fl-list').innerHTML = list.map((a) => `<div class="client-row${a.disabled ? ' archived' : ''}">
       <button class="card card-link" type="button" data-fopen="${a.member_id}"><div class="split"><div class="card-title">${esc(a.name)}</div>${a.disabled ? '<span class="chip off">Turned off</span>' : `<span class="chip ${+a.owed > 0 ? 'on' : ''}">${money(+a.owed)} owed</span>`}</div>
-        <div class="status-line">${a.phones} phone${a.phones == 1 ? '' : 's'} · ${money(+a.total_paid)} total${a.last_upload_at ? ' · last upload ' + esc(et(a.last_upload_at)) : ' · nothing uploaded yet'}</div>
+        <div class="status-line">${a.phones} item${a.phones == 1 ? '' : 's'} · ${money(+a.total_paid)} total${a.last_upload_at ? ' · last upload ' + esc(et(a.last_upload_at)) : ' · nothing uploaded yet'}</div>
         <div class="muted">@${esc(a.username)}${a.last_login_at ? ' · last login ' + esc(et(a.last_login_at)) : ' · never logged in'}</div>
-        <div class="chips"><span class="chip">${a.receipts} receipt${a.receipts == 1 ? '' : 's'}</span><span class="chip ${a.logged > 0 ? 'on' : ''}">${a.logged} logged</span>${a.phones - a.logged > 0 ? `<span class="chip">${a.phones - a.logged} returned</span>` : ''}</div></button>
+        <div class="chips">${Object.entries(a.types || {}).map(([k, v]) => `<span class="chip on">${esc(itemType(k).label)} ${v}</span>`).join('')}<span class="chip">${a.receipts} receipt${a.receipts == 1 ? '' : 's'}</span><span class="chip">${a.logged} logged</span>${a.phones - a.logged > 0 ? `<span class="chip">${a.phones - a.logged} returned</span>` : ''}</div></button>
       <div class="client-menu"><button type="button" class="client-menu-trigger" aria-label="More actions for ${esc(a.name)}" aria-haspopup="menu" aria-expanded="${flMenu === a.id}" data-fmenu="${a.id}">⋯</button>
         ${flMenu === a.id ? `<div class="client-menu-pop" role="menu"><button role="menuitem" data-fopen="${a.member_id}">Open friend</button><button role="menuitem" data-acct="${a.id}">Edit / reset PIN</button><button role="menuitem" data-ftoggle="${a.id}">${a.disabled ? 'Turn login back on' : 'Turn off login'}</button></div>` : ''}</div></div>`).join('')
       || `<p class="empty">${flFilter === 'active' ? 'No friend accounts yet. Tap + New friend.' : 'No turned-off logins.'}</p>`;
@@ -1157,16 +1231,16 @@
     const kv = (k, v) => v ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : '';
     $('#fd-body').innerHTML = `<div class="cd-hero dash-hero" style="margin-top:10px"><div class="cd-hero-txt" style="padding:4px 4px"><p class="k">Friend${a && a.role === 'admin' ? ' · admin' : ''}</p><p class="h">${esc(d.member.name)}</p>
         <p class="w">${a ? '@' + esc(a.username) + (a.disabled ? ' · login turned off' : '') + (a.last_login_at ? ' · last login ' + esc(et(a.last_login_at)) : ' · never logged in') : 'No login'}</p></div></div>
-      <div class="stats"><div class="wide"><small>Payout owed · ${logged.length} logged phone${logged.length === 1 ? '' : 's'}</small><b>${money(owed)}</b></div>
+      <div class="stats"><div class="wide"><small>Payout owed · ${logged.length} logged item${logged.length === 1 ? "" : "s"}</small><b>${money(owed)}</b></div>
         <div><small>Items brought</small><b>${P.length}</b></div><div><small>Total paid (all)</small><b>${money(total)}</b></div></div>
       ${a && a.role !== 'admin' ? `<div class="actions"><button class="btn" data-acct="${a.id}">Edit / reset PIN</button><button class="btn" data-ftoggle="${a.id}">${a.disabled ? 'Turn login on' : 'Turn login off'}</button></div>` : ''}
-      <div class="kicker">Items (${P.length})</div>
-      ${P.map((p) => `<div class="card fd-item"><div class="row"><p class="t grow">${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
+      <div class="kicker">Items (${P.length})${[...new Set(P.map((p) => p.item_type || 'phone'))].length > 1 ? ' · ' + [...new Set(P.map((p) => p.item_type || 'phone'))].map((k) => `${esc(itemType(k).label)} ${P.filter((p) => (p.item_type || 'phone') === k).length}`).join(' · ') : ''}</div>
+      ${P.map((p) => `<div class="card fd-item"><div class="row"><p class="t grow">${typeChip(p)}${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
         <p class="d">${esc(etLong(p.created_at))} · ${p.status === 'logged' ? 'Logged (payout owed)' : 'Returned'}</p>
-        <dl class="kv">${kv('Serial', p.serial)}${kv('IMEI', p.imei1)}${kv('IMEI 2', p.imei2)}${kv('Part no.', p.part_number)}${kv('Model', p.model)}${kv('Color', p.color)}${kv('Storage', p.storage)}${kv('SKU', p.sku)}${kv('Order no.', p.order_number)}${kv('Handwritten', p.handwritten_serial)}${kv('Name entered', p.entered_name)}${kv('Payout', money(+p.price_paid))}${kv('Notes', p.notes)}</dl>
+        <dl class="kv">${kv('Type', itemType(p.item_type).label.replace(/s$/, ''))}${kv('Name', p.item_name)}${kv('Serial', p.serial)}${kv('IMEI', p.imei1)}${kv('IMEI 2', p.imei2)}${kv('Part no.', p.part_number)}${kv('Model', p.model)}${kv('Color', p.color)}${kv('Storage', p.storage)}${kv('SKU', p.sku)}${kv('Order no.', p.order_number)}${kv('Handwritten', p.handwritten_serial)}${kv('Name entered', p.entered_name)}${kv('Payout', money(+p.price_paid))}${kv('Notes', p.notes)}${safeUrl(p.receipt_url) ? `<dt>Receipt link</dt><dd><a href="${esc(p.receipt_url)}" target="_blank" rel="noopener noreferrer">${esc(p.receipt_url.replace(/^https?:\/\//, '').slice(0, 48))} ↗</a></dd>` : ''}</dl>
         ${hwMismatch(p) ? `<p class="flag">Handwritten serial “${esc(p.handwritten_serial)}” doesn’t match the scanned serial</p>` : ''}
         ${rcFor(p.id).length ? `<div style="margin-top:8px">${rcFor(p.id).map(rcRow).join('')}</div>` : ''}
-        <div class="actions">${p.has_photo ? `<button class="btn" data-fphoto="${p.id}">Box photo</button>` : ''}<button class="btn" data-fedit="${p.id}">Edit</button></div><div data-photo-slot="${p.id}"></div></div>`).join('') || '<p class="empty">No items yet.</p>'}
+        <div class="actions">${p.has_photo ? `<button class="btn" data-fphoto="${p.id}">Photo</button>` : ''}<button class="btn" data-fedit="${p.id}">Edit</button></div><div data-photo-slot="${p.id}"></div></div>`).join('') || '<p class="empty">No items yet.</p>'}
       <div class="kicker">Receipts (${d.receipts.length})</div>
       ${d.receipts.length ? `<div class="card">${d.receipts.map(rcRow).join('')}</div>` : '<p class="empty">No receipts yet.</p>'}`;
   }
@@ -1182,7 +1256,7 @@
       if (t('[data-ftoggle]')) { flMenu = null; const a = flAccounts.find((x) => x.id === +t('[data-ftoggle]').dataset.ftoggle); if (!a) return;
         if (!a.disabled && !confirm(`Turn off ${a.name}'s login? They're signed out right away. Their phones stay.`)) { renderFriends(); return; }
         await call('rd_account_save', { p_id: a.id, p_name: a.name, p_username: a.username, p_pass: null, p_disabled: !a.disabled }); toast(a.disabled ? 'Login turned on' : 'Login turned off'); await loadFriendsView(); return; }
-      if (t('[data-fedit]')) { const p = fdData.phones.find((x) => x.id === +t('[data-fedit]').dataset.fedit); if (p) { if (!ext.members.length) await loadExt().catch(() => {}); openPhone(p); } return; }
+      if (t('[data-fedit]')) { const p = fdData.phones.find((x) => x.id === +t('[data-fedit]').dataset.fedit); if (p) { if (!ext.members.length) await loadExt().catch(() => {}); openAny(p); } return; }
       if (t('[data-fphoto]')) { const id = +t('[data-fphoto]').dataset.fphoto, d = await call('rd_phone_photo', { p_id: id }), slot = $(`[data-photo-slot="${id}"]`);
         if (d && slot) slot.innerHTML = `<img class="fd-thumb" alt="Box photo" src="${esc(d)}">`; return; }
       if (t('[data-arview]')) { openDataUrl(await call('rd_receipt_get', { p_id: +t('[data-arview]').dataset.arview })); return; }

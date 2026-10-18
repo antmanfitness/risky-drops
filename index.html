@@ -62,10 +62,10 @@
       <div class="cd-hero-txt" id="fr-hero"></div>
     </div>
     <div class="card">
-      <p class="t">Upload a phone</p>
-      <p class="d">Start with your name, then scan the box label (Serial, IMEI, Part No.). You confirm everything before it saves.</p>
+      <p class="t">Upload an item</p>
+      <p class="d">Start with your name, then pick what you got. Phones use the box scanner; everything else is a quick form. You confirm before it saves.</p>
       <label class="field">Your name<input type="text" id="fr-name" maxlength="60" autocomplete="name" placeholder="Your name"></label>
-      <button class="btn buy scan-big" id="fr-scan" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>Scan box</button>
+      <div class="tpick-grid" id="fr-pick" role="list" style="margin-top:10px"></div>
     </div>
     <form class="card" id="rc-form" autocomplete="off" novalidate>
       <p class="t">Upload a receipt</p>
@@ -81,7 +81,7 @@
       <div class="actions"><button class="btn buy" type="submit">Upload receipt</button></div>
     </form>
     <div class="stats" id="fr-stats"></div>
-    <div class="kicker">My phones</div>
+    <div class="kicker">My items</div>
     <div id="fr-phones"></div>
     <div class="kicker">My receipts</div>
     <div id="fr-receipts"></div>
@@ -161,13 +161,15 @@
     </div>
   </section>
   <section class="screen" id="tab-phones" hidden>
-    <h2 class="section">Phones</h2>
-    <button class="btn buy scan-big" id="scan-open" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>Scan box</button>
-    <p class="hint" style="margin:6px 4px 14px">Scan the Serial, IMEI and Part No. barcodes on the box label in any order, then confirm and save. Photo and type-in fallbacks are inside.</p>
+    <h2 class="section">Items</h2>
+    <p class="kicker" style="margin-top:4px">What are you logging?</p>
+    <div class="tpick-grid" id="item-pick" role="list"></div>
+    <p class="hint" style="margin:6px 4px 14px">Phones use the box scanner (Serial, IMEI, Part No.). Consoles and Other use a quick form. You confirm everything before it saves.</p>
     <div class="kicker">Collectors &amp; payouts</div>
     <div class="card" id="collectors"></div>
-    <div class="row" style="margin:14px 4px 8px"><div class="kicker grow" style="margin:0">Phone log</div><button class="btn ghost" id="ph-filter-clear" hidden>Show all</button></div>
-    <input type="search" id="ph-search" placeholder="Search serial, IMEI, model, collector" autocapitalize="off" spellcheck="false" style="margin-bottom:10px">
+    <div class="row" style="margin:14px 4px 8px"><div class="kicker grow" style="margin:0">Item log</div><button class="btn ghost" id="ph-filter-clear" hidden>Show all</button></div>
+    <input type="search" id="ph-search" placeholder="Search name, serial, IMEI, model, order, collector" autocapitalize="off" spellcheck="false" style="margin-bottom:10px">
+    <div class="spills" id="ph-types" role="tablist" aria-label="Item type" style="margin:0 0 10px"></div>
     <div id="phone-list"></div>
     <details class="card howto" id="parts-card"><summary>Part number lookup (<span id="parts-count">0</span>)</summary><div id="parts-list"></div>
       <p class="hint">Seeded only with part numbers verified from Apple’s pickup endpoint. Add others from the confirm screen (“Save to lookup”).</p></details>
@@ -176,6 +178,7 @@
     <h2 class="section">Sales</h2>
     <div class="card sd" id="tracker">
       <div class="row sd-top"><p class="t grow">Overview</p><div class="seg sd-range" id="tracker-seg" role="tablist" aria-label="Date range"><button data-p="7">7D</button><button data-p="30">30D</button><button data-p="90">90D</button><button data-p="all" class="on">All</button></div></div>
+      <div class="spills sd-types" id="sd-types" role="tablist" aria-label="Item type"></div>
       <div class="sd-cards" id="sd-cards"></div>
       <div class="sd-chart-wrap">
         <div class="row sd-chart-head"><p class="sd-h grow" id="sd-chart-title">Income over time</p><div class="sd-metric" id="sd-metric" role="tablist" aria-label="Chart metric"><button data-m="rev" class="on">Revenue</button><button data-m="profit">Net profit</button><button data-m="fee">Fees</button><button data-m="cost">Cost</button><button data-m="ship">Shipping</button></div></div>
@@ -273,7 +276,7 @@
 <nav class="tabbar" role="tablist">
   <button data-tab="home" role="tab" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
   <button data-tab="watches" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M21 12h-2"/></svg><span class="badge" id="tab-badge"></span>Watches</button>
-  <button data-tab="phones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Phones</button>
+  <button data-tab="phones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>Items</button>
   <button data-tab="sales" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Sales</button>
   <button data-tab="friends" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>Friends</button>
 </nav>
@@ -282,6 +285,7 @@
   <form id="listing-form" autocomplete="off" novalidate>
     <div class="sheet-grab"></div>
     <p class="t" id="sl-title">New listing</p>
+    <label class="field">Item type<select name="item_type"></select></label>
     <label class="field">Item name<input type="text" name="item" required maxlength="200" placeholder="e.g. PS5 Pro 2TB"></label>
     <label class="field">Platform you're selling on<select name="platform" required><option value="" disabled selected>Choose a platform</option><option value="ebay">eBay</option><option value="stockx">StockX</option><option value="facebook">Facebook Marketplace</option><option value="mercari">Mercari</option><option value="other">Local / Other</option></select></label>
     <label class="field" data-other hidden>Platform name<input type="text" name="platform_custom" maxlength="80" placeholder="e.g. OfferUp, local meetup"></label>
@@ -310,6 +314,7 @@
     <p class="t" id="ss-title">Mark as sold</p>
     <p class="d" id="ss-sub"></p>
     <label class="field">Item<input type="text" name="item" required maxlength="200"></label>
+    <label class="field">Item type<select name="item_type"></select></label>
     <label class="field">Sale price ($)<input type="text" name="price" inputmode="decimal" placeholder="0.00" required></label>
     <label class="field">Platform<select name="platform" required><option value="" disabled selected>Choose a platform</option><option value="ebay">eBay</option><option value="stockx">StockX</option><option value="facebook">Facebook Marketplace</option><option value="mercari">Mercari</option><option value="other">Local / Other</option></select></label>
     <label class="field" data-other hidden>Platform name<input type="text" name="platform_custom" maxlength="80" placeholder="e.g. OfferUp, local meetup"></label>
@@ -394,6 +399,31 @@
     <div class="actions"><button class="btn ghost danger" type="button" id="sp-delete" hidden>Delete entry</button></div>
   </form>
   <datalist id="dl-model"></datalist><datalist id="dl-color"></datalist><datalist id="dl-storage"></datalist>
+</div>
+<div class="sheet" id="sheet-item" hidden role="dialog" aria-modal="true" aria-labelledby="si-title">
+  <form id="item-form" autocomplete="off" novalidate>
+    <div class="sheet-grab"></div>
+    <p class="t" id="si-title">New console</p>
+    <p class="d" id="si-sub">Check every field before saving.</p>
+    <label class="field" id="si-coll-wrap">Collector<select name="member_id"></select></label>
+    <label class="field" id="si-name-wrap" hidden>Your name<input type="text" name="entered_name" maxlength="60" autocomplete="name"></label>
+    <label class="field">Name<input type="text" name="item_name" required maxlength="120" placeholder="e.g. PS5 Pro"></label>
+    <div class="grid2">
+      <label class="field">Model<input type="text" name="model" maxlength="80" placeholder="optional"></label>
+      <label class="field">Serial<input type="text" name="serial" maxlength="40" autocapitalize="characters" spellcheck="false" placeholder="optional"></label>
+    </div>
+    <div class="grid2">
+      <label class="field">Price paid ($)<input type="text" name="price_paid" inputmode="decimal" required placeholder="0.00"></label>
+      <label class="field">Order number<input type="text" name="order_number" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="optional"></label>
+    </div>
+    <label class="field">Receipt link<input type="url" name="receipt_url" maxlength="500" autocapitalize="off" spellcheck="false" placeholder="https://… (optional)"></label>
+    <label class="field">Notes (optional)<textarea name="notes" rows="2" maxlength="1000"></textarea></label>
+    <div class="field">Photo (optional)<div class="row"><label class="btn" style="flex:1">Add photo<input type="file" name="photo" accept="image/*" capture="environment" hidden></label><img id="si-thumb" class="thumb" alt="" hidden></div></div>
+    <div class="field" id="si-status-wrap" hidden>Status<div class="seg" id="si-status"><button type="button" data-s="logged" class="on">Logged</button><button type="button" data-s="returned">Returned</button></div></div>
+    <p class="msg" id="si-msg"></p>
+    <div class="actions"><button class="btn buy" type="submit">Save item</button><button class="btn" type="button" data-close>Cancel</button></div>
+    <div class="actions"><button class="btn ghost danger" type="button" id="si-delete" hidden>Delete entry</button></div>
+  </form>
 </div>
 <div class="sheet" id="sheet-acct" hidden role="dialog" aria-modal="true" aria-labelledby="sa-title">
   <form id="acct-form" autocomplete="off" novalidate>

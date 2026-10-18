@@ -364,3 +364,15 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .wf-row.net.loss i { background: var(--red); }
 .wf-row.net { border-top: 0.5px solid var(--hair); padding-top: 6px; font-weight: 700; }
 .wf-row.net span { color: var(--text); }
+/* item type picker (registry-driven) */
+.tpick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tpick { display: grid; justify-items: center; gap: 4px; min-height: 96px; padding: 12px 6px; border-radius: 16px; border: 0.5px solid var(--hair); background: var(--card);
+  color: var(--text); font: inherit; cursor: pointer; text-align: center; }
+.tpick:active { transform: scale(.98); }
+.tpick:hover, .tpick:focus-visible { border-color: rgba(var(--accent-rgb), .6); outline: none; box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .35); }
+.tpick svg { width: 30px; height: 30px; color: var(--accent); }
+.tpick b { font-size: 15px; font-weight: 700; }
+.tpick small { color: var(--faint); font-size: 11.5px; line-height: 1.25; }
+#tab-friend .tpick { background: var(--bg-2); }
+.tchip { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; background: var(--accent-dim); color: var(--accent-2); vertical-align: 2px; margin-right: 6px; }
+.sd-types { margin: 10px -2px 0; }
