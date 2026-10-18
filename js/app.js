@@ -129,12 +129,14 @@
   }
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
   $('#gear').addEventListener('click', () => show('settings'));
-  const SUBS = { w: ['list', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
+  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
   function showSub(g, v) {
     if (!SUBS[g].includes(v)) return; state[g + 'sub'] = v;
     document.querySelectorAll(`#${g}-seg button`).forEach((b) => b.classList.toggle('on', b.dataset.v === v));
     SUBS[g].forEach((x) => ($(`#${g}-${x}`).hidden = x !== v));
     if (g === 'w' && v === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
+    if (g === 'w' && v === 'favs' && typeof loadFavs === 'function') loadFavs();
+    if (g === 'w' && v !== 'list' && state.wdetail) { state.wdetail = null; if (typeof renderWatches === 'function') renderWatches(); }
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (g === 'w' ? 'watches' : 'sales') + '/' + v);
   }
   $('#w-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) showSub('w', b.dataset.v); });
@@ -144,81 +146,366 @@
   // Store pills: a watcher's detail like "PS Direct 1000050928: outOfStock $899.0 · Best Buy 6601524: CHECK_STORES $899.99" becomes one compact
   // scrollable row of pills (green glowing dot = live/in stock, gray = sold out/unknown/blocked); only the selected store's detail is shown.
   const storeSel = {};
-  const LIVE_RX = /\b(in[ _-]?stock|instock|add[ _-]?to[ _-]?cart|available|orderable|cart=true|buyable=true)\b/i, DEAD_RX = /out[ _-]?of[ _-]?stock|sold[ _-]?out|unavailable|not available|blocked|cart=false|none/i;
+  const LIVE_RX = /\b(check[ _-]?stores|in[ _-]?stock|instock|add[ _-]?to[ _-]?cart|available|orderable|cart=true|buyable=true)\b/i, DEAD_RX = /out[ _-]?of[ _-]?stock|sold[ _-]?out|unavailable|not available|blocked|cart=false|none/i;
+  const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, '').toLowerCase(); } catch (e) { return ''; } };
+  const enc = encodeURIComponent;
+  // Store registry: every pill's Buy link goes to THAT store's own page (plain https; on iPhone the store's app opens via its universal link
+  // when installed, so no cross-store deep links). Unknown product id → that store's own search, never another store.
+  const STORES = [
+    { rx: /^drop$|drop\.vans/i, name: 'drop.vans.com', host: 'drop.vans.com' },
+    { rx: /^main$|^vans/i, name: 'vans.com', host: 'vans.com', search: (q) => `https://www.vans.com/en-us/search?q=${enc(q)}` },
+    { rx: /best ?buy/i, host: 'bestbuy.com', id: (r) => /^\d{6,8}$/.test(r) && `https://www.bestbuy.com/site/${r}.p?skuId=${r}`, search: (q) => `https://www.bestbuy.com/site/searchpage.jsp?st=${enc(q)}` },
+    { rx: /amazon/i, host: 'amazon.com', id: (r) => /^B0[A-Z0-9]{8}$/.test(r) && `https://www.amazon.com/dp/${r}`, search: (q) => `https://www.amazon.com/s?k=${enc(q)}` },
+    { rx: /ps ?direct|playstation|psn/i, host: 'direct.playstation.com', search: () => 'https://direct.playstation.com/en-us/' },
+    { rx: /apple/i, host: 'apple.com', id: (r) => /^[A-Z0-9]{4,6}\d?[A-Z]{1,2}\/[A-Z]$/.test(r) && `https://www.apple.com/shop/product/${r}`, search: (q) => `https://www.apple.com/us/search/${enc(q)}` },
+    { rx: /target/i, host: 'target.com', search: (q) => `https://www.target.com/s?searchTerm=${enc(q)}` },
+    { rx: /walmart/i, host: 'walmart.com', search: (q) => `https://www.walmart.com/search?q=${enc(q)}` },
+    { rx: /gamestop/i, host: 'gamestop.com', search: (q) => `https://www.gamestop.com/search/?q=${enc(q)}` },
+  ];
+  function storeLink(label, ref, i, single) {
+    const s = STORES.find((x) => x.rx.test(label)), il = safeUrl(i.link);
+    if (!s) return single ? il : '';
+    const byId = s.id && ref && s.id(ref); if (byId) return byId;
+    if (il && hostOf(il) === s.host) return il;
+    const code = (String(i.sub || '').match(/\b(?=[A-Z0-9]*\d)[A-Z0-9]{8,}\b/) || [])[0];
+    return s.search ? s.search(ref || code || i.name) : (single ? il : '');
+  }
   function parseStores(i) {
     if (!i.detail || !i.detail.includes(':')) return [];
     const raw = i.detail.split(' · ').map((x) => x.trim());
     let lead = ''; const mm = /^(.*[.;!?])\s+([^.;!?:]{1,40}:.*)$/.exec(raw[0]); if (mm) { lead = mm[1]; raw[0] = mm[2]; }
     const segs = raw.map((x) => /^([^:]{1,40}):\s*(.*)$/.exec(x));
     if (segs.length < 1 || segs.some((m) => !m)) return [];
-    segs.lead = lead;
-    const out = segs.map((m, n) => {
-      const label = m[1].trim(), rest = m[2].trim(), ref = (label.match(/\b([A-Z0-9]{6,})\b/) || [])[1] || '';
-      const name = label.replace(/\s+[A-Z0-9]{6,}$/, '').replace(/^./, (c) => c.toUpperCase());
+    if (segs.length === 1 && !STORES.some((x) => x.rx.test(segs[0][1].trim()))) return [];   // e.g. "Watcher starts Oct 22, 7:00 PM" is not a store list
+    return segs.map((m) => {
+      const label = m[1].trim(), rest = m[2].trim(), ref = (label.match(/\b([A-Z0-9]{6,}(?:\/[A-Z])?)\b/) || [])[1] || '';
+      const reg = STORES.find((x) => x.rx.test(label));
+      const name = (reg && reg.name) || label.replace(/\s+[A-Z0-9]{6,}(?:\/[A-Z])?$/, '').replace(/^./, (c) => c.toUpperCase());
       const price = (rest.match(/\$\s?[\d,]+(?:\.\d+)?/) || rest.match(/price=([\d.]+)/) || [])[0];
       const mode = rest.replace(/\$\s?[\d,]+(?:\.\d+)?/g, '').replace(/\s+/g, ' ').trim();
       const live = LIVE_RX.test(rest) && !DEAD_RX.test(rest.replace(LIVE_RX, ''));
-      let link = '';
-      if (/best ?buy/i.test(name) && ref) link = `https://www.bestbuy.com/site/${ref}.p?skuId=${ref}`;
-      else if (/amazon/i.test(name) && /^B0[A-Z0-9]{8}$/.test(ref)) link = `https://www.amazon.com/dp/${ref}`;
-      else if (n === 0) link = safeUrl(i.link);
-      return { key: label, lead, name: name + (segs.filter((x) => x[1].replace(/\s+[A-Z0-9]{6,}$/, '') === m[1].replace(/\s+[A-Z0-9]{6,}$/, '')).length > 1 && ref ? ' ' + ref.slice(-4) : ''), ref, price: price ? (price.startsWith('$') ? price.replace(/\s/g, '') : '$' + price.replace('price=', '')) : '', mode, live, link };
+      const dup = segs.filter((x) => x[1].replace(/\s+[A-Z0-9]{6,}$/, '') === m[1].replace(/\s+[A-Z0-9]{6,}$/, '')).length > 1;
+      return { key: label, lead, name: name + (dup && ref ? ' ' + ref.slice(-4) : ''), ref, price: price ? (price.startsWith('$') ? price.replace(/\s/g, '') : '$' + price.replace('price=', '')) : '', mode, live, link: storeLink(label, ref, i, segs.length === 1) };
     });
-    return out;
   }
+  const selStore = (i, st) => st.find((x) => x.key === storeSel[i.id]) || st.find((x) => x.live) || st[0];
   function storesHtml(i) {
     const st = parseStores(i);
     if (!st.length) return i.detail ? `<p class="d">${esc(i.detail)}</p>` : '';
-    const selKey = storeSel[i.id] && st.find((x) => x.key === storeSel[i.id]) ? storeSel[i.id] : (st.find((x) => x.live) || st[0]).key, s = st.find((x) => x.key === selKey);
-    return `${st[0].lead ? `<p class="d">${esc(st[0].lead)}</p>` : ''}<div class="spills" role="tablist" aria-label="Stores">${st.map((x) => `<button type="button" role="tab" aria-selected="${x.key === selKey}" class="spill ${x.key === selKey ? 'on' : ''}" data-store="${esc(i.id)}" data-skey="${esc(x.key)}"><i class="${x.live ? 'live' : ''}"></i>${esc(x.name)}</button>`).join('')}</div>
-      <p class="sline"><b>${s.live ? 'Live' : 'Not live'}</b>${s.price ? `<span>${esc(s.price)}</span>` : ''}${s.mode ? `<span>${esc(s.mode)}</span>` : ''}<span>checked ${i.last_check ? esc(et(i.last_check)) : '—'}</span>${s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener noreferrer">Open ↗</a>` : ''}</p>`;
+    const s = selStore(i, st);
+    return `${st[0].lead ? `<p class="d">${esc(st[0].lead)}</p>` : ''}<div class="spills" role="tablist" aria-label="Stores">${st.map((x) => `<button type="button" role="tab" aria-selected="${x === s}" class="spill ${x === s ? 'on' : ''}" data-store="${esc(i.id)}" data-skey="${esc(x.key)}"><i class="${x.live ? 'live' : ''}"></i>${esc(x.name)}</button>`).join('')}</div>
+      <p class="sline"><b>${s.live ? 'Live' : 'Not live'}</b>${s.price ? `<span>${esc(s.price)}</span>` : ''}${s.mode ? `<span>${esc(s.mode)}</span>` : ''}<span>checked ${i.last_check ? esc(et(i.last_check)) : '—'}</span></p>`;
   }
+  // Buy button: the selected store pill's own link, else the watch's product link.
+  function buyFor(i) {
+    const st = parseStores(i), s = st.length ? selStore(i, st) : null;
+    return s && s.link ? { href: s.link, label: `Buy at ${s.name} ↗` } : (safeUrl(i.link) ? { href: safeUrl(i.link), label: 'Buy ↗' } : null);
+  }
+  const isBlocked = (i) => (i.health && i.health.status === 'blocked') || i.status === 'blocked';
+  const hasProblem = (i) => isBlocked(i) || (i.health && i.health.status === 'error') || i.status === 'error';
+  function storeNames(i) {
+    const st = parseStores(i); if (st.length) return st.map((x) => x.name);
+    if (i.kind === 'apple' || /^Apple /.test(i.sub || '') || hostOf(i.link).endsWith('apple.com')) return ['Apple'];
+    const h = hostOf(i.link); return h ? [h] : [];
+  }
+  // Last time a watch was really in stock: now (if its latest check says so) or its newest restock alert.
+  function lastInStock(i) {
+    if (i.status === 'in_stock') return i.last_check || state.status?.generated || null;
+    let best = null;
+    for (const a of state.alerts) if (a.kind === 'restock' && (a.source === i.id || a.source === 'app:' + i.id) && (!best || a.ts > best)) best = a.ts;
+    return best;
+  }
+
+  // ----- favorites state (hosted only; a saved list — nothing here starts checks)
+  let favs = [], favsLoaded = false, wMenu = null, dashSort = localStorage.getItem('rd-dash-sort') || 'recent';
+  const favFor = (i) => favs.find((f) => !f.promoted_at && (f.watch_id === i.id || (f.url && f.url === i.link)));
+
+  function watchCard(i) {
+    const buy = buyFor(i), blocked = isBlocked(i), prob = hasProblem(i), favd = favFor(i);
+    const procTxt = i.status === 'scheduled' ? 'Starts on schedule' : i.alive ? `Watcher alive (pid ${i.pid})` : (i.status === 'blocked' && !i.builtin ? 'Not polled' : 'Watcher not running');
+    const pauseBtn = i.can_pause ? (i.paused || (!i.alive && i.builtin)
+      ? `<button class="btn" data-act="resume" data-id="${esc(i.id)}">${i.paused ? 'Resume' : 'Start'}</button>`
+      : `<button class="btn" data-act="pause" data-id="${esc(i.id)}">Pause</button>`) : '';
+    const h = i.health || {};
+    const blockLine = prob ? `<p class="blk-line"><b>${blocked ? 'Blocked' : 'Check failing'}</b>${h.http_status ? `<span>HTTP ${esc(h.http_status)}</span>` : ''}${h.kind ? `<span>${esc(KIND_SHORT[h.kind] || h.kind.replace(/_/g, ' '))}</span>` : ''}${h.consecutive_failures ? `<span>${esc(h.consecutive_failures)}× in a row</span>` : ''}${h.blocked_at ? `<span>since ${esc(et(h.blocked_at))}</span>` : ''}</p>` : '';
+    return `<div class="card wcard ${i.status === 'in_stock' ? 'in-stock-card' : ''} ${blocked ? 'blocked-card' : ''}" id="wc-${esc(i.id)}">
+      <div class="row"><p class="t grow">${favd ? '<span class="fav-star" title="In favorites" aria-label="In favorites">★</span> ' : ''}${esc(i.name)}</p><span class="pill ${esc(blocked ? 'blocked' : i.status)}">${esc(blocked ? 'Blocked' : (LABEL[i.status] || i.status))}</span>
+        ${CFG ? `<div class="client-menu wmenu"><button type="button" class="client-menu-trigger" aria-label="More actions for ${esc(i.name)}" aria-haspopup="menu" aria-expanded="${wMenu === i.id}" data-wmenu="${esc(i.id)}">⋯</button>
+        ${wMenu === i.id ? `<div class="client-menu-pop" role="menu"><button type="button" role="menuitem" data-wfav="${esc(i.id)}">${favd ? '★ In favorites' : '☆ Add to favorites'}</button><button type="button" role="menuitem" data-wdiag="${esc(i.id)}">Diagnose</button><button type="button" role="menuitem" class="danger" data-wdel="${esc(i.id)}">Delete watch</button></div>` : ''}</div>` : ''}</div>
+      <p class="d">${esc(i.sub)}</p>
+      ${blockLine}
+      ${storesHtml(i)}
+      ${i.extra ? `<p class="f">${esc(i.extra)}</p>` : ''}
+      <div class="meta"><span class="row" style="gap:6px"><span class="dot ${i.alive ? 'on' : (i.status === 'scheduled' || i.paused || (i.status === 'blocked' && !i.builtin) ? '' : 'off')}"></span>${esc(procTxt)}</span>
+        <span>Last check: ${i.last_check ? esc(et(i.last_check)) : '—'}${i.stale ? ' (stale)' : ''}</span></div>
+      ${CFG ? dropHtml(i) : ''}
+      <div class="actions">${buy ? `<a class="btn buy" href="${esc(buy.href)}" target="_blank" rel="noopener noreferrer">${esc(buy.label)}</a>` : ''}${prob && CFG ? `<button class="btn warn" data-wretry="${esc(i.id)}">Retry</button><button class="btn" data-wdiag="${esc(i.id)}">Diagnose</button>` : ''}${pauseBtn}${CFG ? `<button class="btn" data-drop="${esc(i.id)}">Drop time</button>` : ''}${!CFG && !i.builtin ? `<button class="btn ghost" data-act="delete" data-id="${esc(i.id)}">Remove</button>` : ''}</div>
+    </div>`;
+  }
+
+  // ----- multi-watch dashboard (top of the Watches tab): every active watch at a glance, real data only
+  function dashState(i) { return isBlocked(i) ? 'blocked' : i.status === 'in_stock' ? 'live' : 'quiet'; }
+  function renderDashW(items) {
+    const act = items.filter((i) => !i.paused && i.status !== 'paused');
+    if (!act.length) { $('#w-dash').innerHTML = ''; return; }
+    const rows = act.map((i) => ({ i, st: dashState(i), stores: storeNames(i), lis: lastInStock(i) }));
+    if (dashSort === 'store') rows.sort((a, b) => (a.stores[0] || '~').localeCompare(b.stores[0] || '~', 'en', { sensitivity: 'base' }) || a.i.name.localeCompare(b.i.name));
+    else rows.sort((a, b) => (b.lis || '').localeCompare(a.lis || '') || (a.st === 'blocked') - (b.st === 'blocked') || a.i.name.localeCompare(b.i.name));
+    let grp = '';
+    const html = rows.map((r) => {
+      const g = dashSort === 'store' ? (r.stores[0] || 'Other') : '';
+      const head = g && g.toLowerCase() !== grp.toLowerCase() ? `<div class="wd-grp">${esc(g)}</div>` : ''; if (g) grp = g;
+      const lbl = r.st === 'live' ? 'In stock' : r.st === 'blocked' ? 'Blocked' : 'Quiet';
+      return `${head}<button type="button" class="wd-row" data-wopen="${esc(r.i.id)}" aria-label="${esc(r.i.name)}: ${lbl}. Open details">
+        <span class="wd-main"><b>${esc(r.i.name)}</b><small>${esc(r.stores.join(' · ') || '—')}</small></span>
+        <span class="wd-side"><span class="dpill ${r.st}">${lbl}</span><small>${r.i.last_check ? 'checked ' + esc(et(r.i.last_check)) : 'not checked yet'}</small><small>${r.lis ? (r.st === 'live' ? 'in stock now' : 'last in stock ' + esc(et(r.lis))) : 'never in stock'}</small></span>
+        <svg class="wd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>`;
+    }).join('');
+    $('#w-dash').innerHTML = `<div class="card wd"><div class="row wd-top"><p class="t grow">All watches <small class="muted">${act.length} active</small></p>
+      <div class="seg wd-sort" role="group" aria-label="Sort watches"><button type="button" data-dsort="recent" class="${dashSort === 'recent' ? 'on' : ''}">Recently in stock</button><button type="button" data-dsort="store" class="${dashSort === 'store' ? 'on' : ''}">By store</button></div></div>
+      <div class="wd-list">${html}</div></div>`;
+  }
+  $('#w-dash').addEventListener('click', (e) => {
+    const s = e.target.closest('[data-dsort]'); if (s) { dashSort = s.dataset.dsort; localStorage.setItem('rd-dash-sort', dashSort); renderWatches(); return; }
+    const r = e.target.closest('[data-wopen]'); if (r) location.hash = 'watches/w/' + encodeURIComponent(r.dataset.wopen);
+  });
+
   function renderWatches() {
     const items = state.status?.items || [];
     const lastSync = state.syncedAt || state.status?.generated;
     const stale = lastSync && Date.now() - new Date(lastSync).getTime() > 3 * 60 * 1000;
     $('#updated').textContent = lastSync ? (stale ? 'Box offline? Last sync ' : 'Updated ') + et(lastSync) : '';
     $('#updated').style.color = stale ? 'var(--red)' : '';
+    const detail = state.wdetail ? items.find((i) => i.id === state.wdetail) : null;
+    $('#w-main').hidden = !!state.wdetail; $('#w-detail').hidden = !state.wdetail;
+    if (state.wdetail) {
+      const hist = detail ? state.alerts.filter((a) => a.source === detail.id || a.source === 'app:' + detail.id).slice(0, 30) : [];
+      $('#wdetail-body').innerHTML = detail ? watchCard(detail) + `<div class="kicker">Alert history</div>` + (hist.map((a) => `<div class="card slim"><div class="row"><p class="t grow">${esc(a.store || a.item || a.title)}</p><span class="pill ${esc(a.kind)}">${a.kind === 'restock' ? 'Restock' : esc(a.kind)}</span></div>${a.detail ? `<p class="d">${esc(a.detail)}</p>` : ''}<p class="f">${esc(a.time_et || et(a.ts))}</p></div>`).join('') || '<p class="empty">No alerts for this watch yet.</p>')
+        : '<p class="empty">This watch is gone (deleted or not synced yet).</p>';
+      return;
+    }
     const sum = $('#summary'); sum.innerHTML = '';
-    const active = items.filter((i) => i.status !== 'scheduled' && i.status !== 'paused' && i.status !== 'blocked' || i.builtin && i.id === 'vans');
     const alive = items.filter((i) => i.alive).length;
     const shouldRun = items.filter((i) => i.can_pause && !i.paused && !(i.status === 'blocked' && !i.builtin)).length || 1;
-    const hot = items.filter((i) => i.status === 'in_stock').length;
+    const hot = items.filter((i) => i.status === 'in_stock').length, nb = items.filter(isBlocked).length;
     sum.appendChild(OrbitRing({ pct: (alive / shouldRun) * 100, size: 74, tone: hot ? 'alert' : undefined,
       center: `<b>${alive}/${shouldRun}</b><small>alive</small>`, label: `${alive} of ${shouldRun} watchers alive` }));
     const txt = document.createElement('div'); txt.className = 'grow';
     txt.innerHTML = `<p class="t">${hot ? `${hot} in stock now` : 'Nothing in stock right now'}</p>
-      <p class="d">${alive} watcher${alive === 1 ? '' : 's'} running · ${items.length} items. Tap Buy to open the product or Apple pickup page; you check out yourself.</p>`;
+      <p class="d">${alive} watcher${alive === 1 ? '' : 's'} running · ${items.length} items${nb ? ` · <span class="blk-txt">${nb} blocked</span>` : ''}. Tap Buy to open that store's page; you check out yourself.</p>`;
     sum.appendChild(txt);
-    $('#watch-list').innerHTML = items.map((i) => {
-      const link = safeUrl(i.link);
-      const procTxt = i.status === 'scheduled' ? 'Starts on schedule' : i.alive ? `Watcher alive (pid ${i.pid})` : (i.status === 'blocked' && !i.builtin ? 'Not polled' : 'Watcher not running');
-      const pauseBtn = i.can_pause ? (i.paused || (!i.alive && i.builtin)
-        ? `<button class="btn" data-act="resume" data-id="${esc(i.id)}">${i.paused ? 'Resume' : 'Start'}</button>`
-        : `<button class="btn" data-act="pause" data-id="${esc(i.id)}">Pause</button>`) : '';
-      const del = !i.builtin ? `<button class="btn ghost" data-act="delete" data-id="${esc(i.id)}" aria-label="Remove">Remove</button>` : '';
-      return `<div class="card ${i.status === 'in_stock' ? 'in-stock-card' : ''}">
-        <div class="row"><p class="t grow">${esc(i.name)}</p><span class="pill ${esc(i.status)}">${esc(LABEL[i.status] || i.status)}</span></div>
-        <p class="d">${esc(i.sub)}</p>
-        ${storesHtml(i)}
-        ${i.extra ? `<p class="f">${esc(i.extra)}</p>` : ''}
-        <div class="meta"><span class="row" style="gap:6px"><span class="dot ${i.alive ? 'on' : (i.status === 'scheduled' || i.paused || (i.status === 'blocked' && !i.builtin) ? '' : 'off')}"></span>${esc(procTxt)}</span>
-          <span>Last check: ${i.last_check ? esc(et(i.last_check)) : '—'}${i.stale ? ' (stale)' : ''}</span></div>
-        ${CFG ? dropHtml(i) : ''}
-        <div class="actions">${link ? `<a class="btn buy" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>` : ''}${pauseBtn}${CFG ? `<button class="btn" data-drop="${esc(i.id)}">Drop time</button>` : ''}${del}</div>
-      </div>`;
-    }).join('') || '<p class="empty">No watches yet.</p>';
+    renderDashW(items);
+    $('#watch-list').innerHTML = items.map(watchCard).join('') || '<p class="empty">No watches yet.</p>';
   }
-  $('#watch-list').addEventListener('click', async (e) => {
-    const sp = e.target.closest('button[data-store]'); if (sp) { storeSel[sp.dataset.store] = sp.dataset.skey; renderWatches(); return; }
-    const b = e.target.closest('button[data-act]'); if (!b) return;
+
+  // ----- confirm dialog (red for destructive)
+  function confirmBox({ title, body, ok = 'OK', danger = false }) {
+    return new Promise((res) => {
+      const d = $('#cdlg'); $('#cdlg-t').textContent = title; $('#cdlg-b').textContent = body || '';
+      const okb = $('#cdlg-ok'); okb.textContent = ok; okb.className = 'btn ' + (danger ? 'danger' : 'buy');
+      d.hidden = false; $('#cdlg-back').hidden = false; okb.focus();
+      const done = (v) => { d.hidden = true; $('#cdlg-back').hidden = true; okb.onclick = null; $('#cdlg-no').onclick = null; $('#cdlg-back').onclick = null; res(v); };
+      okb.onclick = () => done(true); $('#cdlg-no').onclick = () => done(false); $('#cdlg-back').onclick = () => done(false);
+    });
+  }
+  async function waitCmd(id, quiet) {
+    if (!quiet) toast('Sent to the box. It applies changes within about 30 seconds…');
+    for (let n = 0; n < 45; n++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const st = await rpc('rd_command_status', { p_key: KEY, p_id: id });
+      if (st && st.state === 'done') { snap = null; return st.result || {}; }
+      if (st && st.state === 'failed') throw new Error((st.result && st.result.error) || 'The box could not apply that');
+    }
+    throw new Error('The box has not picked this up yet. Is it online? It will apply it when it reconnects.');
+  }
+
+  // ----- Diagnose: plain-English report from the DB health record
+  const KIND_SHORT = { http_403: '403 Forbidden', http_429: '429 rate limit', http_503: '503 unavailable', perimeterx: 'PerimeterX wall', datadome: 'DataDome wall', cloudflare: 'Cloudflare wall', akamai: 'Akamai wall', captcha: 'captcha page', access_denied: 'access denied', redirect: 'unexpected redirect', empty: 'empty response', garbled: 'garbled response', timeout: 'timeout', network: 'network error', known_block: 'known bot wall', bot_wall: 'bot wall', check_error: 'check error' };
+  function kindText(h) {
+    const k = h.kind || '', fu = h.final_url || 'another page';
+    const wall = { perimeterx: 'PerimeterX', datadome: 'DataDome', cloudflare: 'Cloudflare', akamai: 'Akamai' }[k];
+    if (wall) return (h.http_status && h.http_status !== 200 ? `The store refused the request (HTTP ${h.http_status}) and ` : 'The store ') + `served a bot-protection page (${wall}) instead of the product, so the box couldn't read stock.`;
+    return ({
+      http_403: 'The store refused the request (HTTP 403 Forbidden). That is almost always bot protection blocking this box’s IP or browserless requests.',
+      http_429: 'The store is rate-limiting the box (HTTP 429 Too Many Requests): it checked too often for their liking.',
+      http_503: 'The store answered 503 Service Unavailable, which usually means a bot wall or a queue/waiting-room page.',
+      captcha: 'A captcha / “are you human?” page came back instead of the product page.',
+      access_denied: 'An “Access Denied” page came back instead of the product page.',
+      redirect: `The product URL redirected to ${fu} instead of the product page (often a block, region or error page).`,
+      empty: 'The store sent back an empty (or nearly empty) page, which is how some bot walls respond.',
+      garbled: 'The response was garbled / not readable text, so there was nothing to parse.',
+      timeout: 'The store didn’t answer within 30 seconds (timeout).',
+      network: 'The box couldn’t reach the store (network / DNS error).',
+      known_block: 'This site is on the box’s known-blocked list (its bot protection blocks box requests), so it is not polled automatically.',
+      bot_wall: 'The watcher’s own log reports it is blocked by the store’s bot wall.',
+      check_error: 'The watcher reported an error on its last check.',
+    })[k] || (k.startsWith('http_') ? `The store answered HTTP ${k.slice(5)}.` : 'The last check failed.');
+  }
+  function fixText(h, i) {
+    const host = hostOf(h.final_url || i.link), k = h.kind || '';
+    const by = (re) => re.test(host);
+    if (k === 'timeout' || k === 'network') return 'Usually temporary. Tap Retry in a few minutes; if it keeps failing, the store may be down.';
+    if (k === 'http_429') return 'Back off: wait 15–30 minutes, then Retry. The watcher already spaces its checks out.';
+    if (k === 'redirect' && !/block|captcha|denied|challenge/i.test(h.final_url || '')) return 'Open the link yourself; if the product moved, delete this watch and add the new product URL.';
+    const store = by(/target\.com/) ? 'Target' : by(/walmart\.com/) ? 'Walmart' : by(/gamestop\.com/) ? 'GameStop' : by(/vans\.com/) ? 'Vans' : by(/amazon\./) ? 'Amazon' : by(/bestbuy\.com/) ? 'Best Buy' : by(/apple\.com/) ? 'Apple' : '';
+    return `${store ? store + ' bot protection' : 'Bot protection'}; try again later or check it in ${store ? 'the ' + store : 'the store’s'} app. The box can’t solve captchas (by design), so a watch that stays blocked won’t alert.`;
+  }
+  async function openDiag(id) {
+    const i = (state.status?.items || []).find((x) => x.id === id); if (!i) return;
+    let h = null;
+    if (CFG) { try { h = await rpc('rd_watch_diagnose', { p_key: KEY, p_id: id }); } catch (e) { toast(e.message); } }
+    h = h ? { ...h, kind: h.last_error_kind, detail: h.last_error_detail } : (i.health || {});
+    const ok = !h.status || h.status === 'ok';
+    $('#dg-title').textContent = 'Diagnose · ' + i.name;
+    $('#dg-body').innerHTML = ok
+      ? `<p class="dg-ok">No problem on the last check.</p><p class="d">Last checked ${esc(et(h.checked_at || i.last_check) || '—')}${h.last_ok_at ? ` · last good check ${esc(et(h.last_ok_at))}` : ''}. Status: ${esc(LABEL[i.status] || i.status)}${i.detail ? ' · ' + esc(i.detail) : ''}.</p>`
+      : `<p class="dg-what">${esc(kindText(h))}</p>
+        <dl class="dg-dl"><dt>Status</dt><dd><span class="pill ${h.status === 'blocked' ? 'blocked' : 'error'}">${h.status === 'blocked' ? 'Blocked' : 'Error'}</span></dd>
+        <dt>HTTP status</dt><dd>${h.http_status ? esc(h.http_status) : '—'}</dd>
+        <dt>Final URL</dt><dd class="dg-url">${h.final_url ? esc(h.final_url) : '—'}</dd>
+        <dt>Last check</dt><dd>${esc(et(h.checked_at) || '—')}</dd>
+        <dt>Blocked since</dt><dd>${h.blocked_at ? esc(et(h.blocked_at)) : '—'}</dd>
+        <dt>Failures in a row</dt><dd>${esc(h.consecutive_failures ?? '—')}</dd>
+        <dt>Detail</dt><dd>${esc(h.detail || '—')}</dd></dl>
+        ${h.snippet ? `<p class="kicker" style="margin-top:12px">What the store sent (snippet)</p><pre class="dg-snip">${esc(h.snippet)}</pre>` : ''}
+        <p class="kicker" style="margin-top:12px">Suggested fix</p><p class="d">${esc(fixText(h, i))}</p>`;
+    $('#dg-retry').hidden = ok || !CFG; $('#dg-retry').dataset.id = id;
+    sheet('#sheet-diag');
+  }
+  async function doRetry(id, btn) {
+    const i = (state.status?.items || []).find((x) => x.id === id); if (!i) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Retrying…'; }
+    try {
+      const c = await rpc('rd_watch_retry', { p_key: KEY, p_id: id });
+      toast('Retry sent. The box re-runs this check now…');
+      const r = await waitCmd(c.id, true);
+      const h = r.health;
+      toast(r.builtin ? 'Built-in watcher: status refreshed (it re-checks on its own loop).' : !h || h.status === 'ok' ? `Check OK: ${LABEL[r.status] || r.status || 'done'}. Blocked flag cleared.` : `Still ${h.status === 'blocked' ? 'blocked' : 'failing'}: ${KIND_SHORT[h.kind] || h.kind}${h.http_status ? ' (HTTP ' + h.http_status + ')' : ''}.`);
+      await load();
+    } catch (e) { toast(e.message); }
+    if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+  }
+  async function doDelete(id) {
+    const i = (state.status?.items || []).find((x) => x.id === id); if (!i) return;
+    const ok = await confirmBox({ title: `Delete watch for ${i.name}?`, danger: true, ok: 'Delete watch',
+      body: 'Alerts stop and it’s removed from your list.' + (i.builtin ? ' This is a built-in watcher: the box stops its process and won’t restart it.' : '') + ' Past alerts stay in your history.' });
+    if (!ok) return;
+    try {
+      if (CFG) {
+        const c = await rpc('rd_watch_delete', { p_key: KEY, p_id: id });
+        state.status.items = state.status.items.filter((x) => x.id !== id); if (state.wdetail === id) location.hash = 'watches/list'; renderWatches();
+        toast('Deleted. The box stops its checks within about 30 seconds.');
+        waitCmd(c.id, true).then((r) => { toast(r.killed === false && r.builtin ? 'Watch deleted.' : 'Watch deleted and its checks stopped.'); load(); }).catch((e) => toast(e.message));
+      } else { await api(`/api/items/${encodeURIComponent(id)}/delete`, {}); toast('Deleted'); load(); }
+    } catch (e) { toast(e.message); }
+  }
+  async function favFromWatch(id) {
+    const i = (state.status?.items || []).find((x) => x.id === id); if (!i) return;
+    if (favFor(i)) { toast('Already in favorites'); return; }
+    const st = parseStores(i), s = st.length ? selStore(i, st) : null;
+    const sku = (String(i.sub || '').match(/\b(?:[A-Z0-9]{4,6}\d?[A-Z]{1,2}\/[A-Z]|(?=[A-Z0-9]*\d)[A-Z0-9]{8,})\b/) || [])[0] || (s && s.ref) || '';
+    try {
+      const f = await rpc('rd_fav_save', { p_key: KEY, p_fav: { name: i.name, url: safeUrl(i.link) || null, store: storeNames(i)[0] || '', sku, source: 'watch', watch_id: i.id } });
+      if (!f.existing) favs.unshift(f); toast(f.existing ? 'Already in favorites' : 'Saved to favorites (the watch is unchanged)'); renderWatches(); renderFavs();
+    } catch (e) { toast(e.message); }
+  }
+
+  const onWatchClick = async (e) => {
+    const t = (s) => e.target.closest(s);
+    const sp = t('button[data-store]'); if (sp) { storeSel[sp.dataset.store] = sp.dataset.skey; renderWatches(); return; }
+    if (t('[data-wmenu]')) { const id = t('[data-wmenu]').dataset.wmenu; wMenu = wMenu === id ? null : id; renderWatches(); return; }
+    if (t('[data-wdel]')) { wMenu = null; renderWatches(); doDelete(t('[data-wdel]').dataset.wdel); return; }
+    if (t('[data-wfav]')) { wMenu = null; favFromWatch(t('[data-wfav]').dataset.wfav); return; }
+    if (t('[data-wdiag]')) { wMenu = null; renderWatches(); openDiag(t('[data-wdiag]').dataset.wdiag); return; }
+    if (t('[data-wretry]')) { doRetry(t('[data-wretry]').dataset.wretry, t('[data-wretry]')); return; }
+    const b = t('button[data-act]'); if (!b) return;
     const { act, id } = b.dataset;
-    if (act === 'delete' && !confirm('Stop and remove this watch?')) return;
+    if (act === 'delete') { doDelete(id); return; }
     if (act === 'pause' && !confirm('Pause this watcher? It stops checking until you resume.')) return;
     b.disabled = true;
-    try { await api(`/api/items/${encodeURIComponent(id)}/${act}`, {}); toast(act === 'pause' ? 'Paused' : act === 'delete' ? 'Removed' : 'Started'); setTimeout(load, 1500); }
+    try { await api(`/api/items/${encodeURIComponent(id)}/${act}`, {}); toast(act === 'pause' ? 'Paused' : 'Started'); setTimeout(load, 1500); }
     catch (err) { toast(err.message); b.disabled = false; }
-  });
+  };
+  if (!CFG && $('#w-seg-favs')) $('#w-seg-favs').hidden = true;
+  $('#watch-list').addEventListener('click', onWatchClick);
+  $('#wdetail-body').addEventListener('click', onWatchClick);
+  $('#wd-back').addEventListener('click', () => { location.hash = 'watches/list'; });
+  document.addEventListener('click', (e) => { if (wMenu && !e.target.closest('.wmenu')) { wMenu = null; renderWatches(); } });
+  $('#dg-retry').addEventListener('click', (e) => { closeSheet(); doRetry(e.currentTarget.dataset.id); });
+
+  // ----- Favorites: search known items (your watches, alert history, comps) or paste a link; star to save. No checks start.
+  async function loadFavs() {
+    if (!CFG) return;
+    try { favs = await rpc('rd_favs', { p_key: KEY }) || []; favsLoaded = true; renderFavs(); if (state.tab === 'watches') renderWatches(); } catch (e) { toast('Favorites: ' + e.message); }
+  }
+  function searchPool() {
+    const out = [], seen = new Set();
+    const add = (o) => { const k = (o.url || '') + '|' + o.name.toLowerCase(); if (!o.name || seen.has(k)) return; seen.add(k); out.push(o); };
+    for (const i of state.status?.items || []) add({ name: i.name, url: safeUrl(i.link), store: storeNames(i)[0] || '', sku: (String(i.sub || '').match(/\b(?:[A-Z0-9]{4,6}\d?[A-Z]{1,2}\/[A-Z]|(?=[A-Z0-9]*\d)[A-Z0-9]{8,})\b/) || [])[0] || '', from: 'Watch' });
+    for (const a of state.alerts) if (a.kind !== 'test') add({ name: a.item || a.title || '', url: safeUrl(a.link), store: a.store && a.store !== 'online' ? a.store : hostOf(a.link), sku: ((a.item || '').match(/\(([A-Z0-9/]{6,})\)/) || [])[1] || '', from: 'Alert ' + (a.time_et || '') });
+    for (const p of state.flip?.products || []) { const w = (state.status?.items || []).find((i) => i.id === p.id); add({ name: p.name, url: w ? safeUrl(w.link) : '', store: w ? storeNames(w)[0] : '', sku: p.sku || '', from: 'Comps' }); }
+    return out;
+  }
+  function renderFavSearch() {
+    const q = ($('#fav-q').value || '').trim(), box = $('#fav-results');
+    if (!q) { box.innerHTML = ''; return; }
+    const res = [];
+    if (/^https?:\/\/\S+$/i.test(q)) res.push({ name: hostOf(q) + ' item', url: q, store: hostOf(q), sku: '', from: 'Pasted link' });
+    else if (/^[A-Z0-9]{4,6}\d?[A-Z]{1,2}\/[A-Z]$/i.test(q)) res.push({ name: 'Apple ' + q.toUpperCase(), url: 'https://www.apple.com/shop/product/' + q.toUpperCase(), store: 'Apple', sku: q.toUpperCase(), from: 'Apple part number' });
+    const words = q.toLowerCase().split(/\s+/);
+    res.push(...searchPool().filter((o) => words.every((w) => (o.name + ' ' + o.store + ' ' + o.sku).toLowerCase().includes(w))).slice(0, 12));
+    state.favRes = res;
+    box.innerHTML = res.map((o, n) => { const have = favs.some((f) => !f.promoted_at && o.url && f.url === o.url);
+      return `<div class="fav-res"><div class="grow"><b>${esc(o.name)}</b><small>${esc([o.store, o.sku, o.from].filter(Boolean).join(' · '))}</small></div>
+      <button type="button" class="star-btn ${have ? 'on' : ''}" data-fstar="${n}" aria-pressed="${have}" aria-label="${have ? 'In favorites' : 'Add to favorites'}: ${esc(o.name)}">${have ? '★' : '☆'}</button></div>`; }).join('') || '<p class="empty">No matching items. Paste a product link or Apple part number to save it.</p>';
+  }
+  function renderFavs() {
+    if (!$('#fav-list')) return;
+    const list = favs.filter((f) => !f.promoted_at || f.promote_state === 'pending' || f.promote_state === 'failed');
+    $('#fav-count').textContent = list.length ? String(list.length) : '';
+    $('#fav-list').innerHTML = list.map((f) => {
+      const pend = f.promoted_at && f.promote_state === 'pending', watched = !pend && f.url && (state.status?.items || []).some((i) => i.link === f.url);
+      const failed = !watched && f.promoted_at && f.promote_state === 'failed';
+      return `<div class="card fav-card">
+        <div class="row">${f.image ? `<img class="fav-img" src="${esc(f.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="fav-ico" aria-hidden="true">★</span>'}<div class="grow"><p class="t">${esc(f.name)}</p>
+        <p class="d">${esc([f.store, f.sku].filter(Boolean).join(' · ') || hostOf(f.url) || 'No link')}</p></div></div>
+        ${f.note ? `<p class="d fav-note">${esc(f.note)}</p>` : ''}
+        <p class="f">Saved ${esc(et(f.created_at))}${f.source === 'watch' ? ' · from a watch' : ''} · not being checked${pend ? ' · <b>starting watch…</b>' : ''}${failed ? ` · <span class="blk-txt">couldn’t start: ${esc(f.promote_error || 'error')}</span>` : ''}</p>
+        <div class="actions">${pend ? '' : watched ? '<span class="pill active">Already a watch</span>' : `<button class="btn buy" data-fpromote="${f.id}">${failed ? 'Try again' : 'Watch this'}</button>`}${safeUrl(f.url) ? `<a class="btn" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a>` : ''}<button class="btn" data-fnote="${f.id}">Note</button><button class="btn ghost" data-fdel="${f.id}">Remove</button></div></div>`;
+    }).join('') || '<p class="empty">No favorites yet. Search above or tap ⋯ → Add to favorites on any watch. Favorites are just a saved list: nothing gets checked until you tap Watch this.</p>';
+  }
+  if ($('#fav-q')) {
+    $('#fav-q').addEventListener('input', renderFavSearch);
+    $('#fav-results').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-fstar]'); if (!b || b.classList.contains('on')) return;
+      const o = state.favRes[+b.dataset.fstar]; b.disabled = true;
+      try { const f = await rpc('rd_fav_save', { p_key: KEY, p_fav: { name: o.name, url: o.url || null, store: o.store, sku: o.sku, source: 'search' } }); if (!f.existing) favs.unshift(f); toast(f.existing ? 'Already in favorites' : 'Saved to favorites'); renderFavs(); renderFavSearch(); renderWatches(); }
+      catch (err) { toast(err.message); b.disabled = false; }
+    });
+    $('#fav-list').addEventListener('click', async (e) => {
+      const t = (s) => e.target.closest(s);
+      if (t('[data-fdel]')) {
+        const f = favs.find((x) => x.id === +t('[data-fdel]').dataset.fdel); if (!f) return;
+        if (!(await confirmBox({ title: `Remove ${f.name} from favorites?`, body: 'It’s only a bookmark, so nothing else changes.', ok: 'Remove' }))) return;
+        try { await rpc('rd_fav_delete', { p_key: KEY, p_id: f.id }); favs = favs.filter((x) => x.id !== f.id); toast('Removed from favorites'); renderFavs(); renderWatches(); } catch (err) { toast(err.message); }
+      } else if (t('[data-fnote]')) {
+        const f = favs.find((x) => x.id === +t('[data-fnote]').dataset.fnote); if (!f) return;
+        const n = prompt('Note for ' + f.name, f.note || ''); if (n === null) return;
+        try { Object.assign(f, await rpc('rd_fav_note', { p_key: KEY, p_id: f.id, p_note: n })); renderFavs(); } catch (err) { toast(err.message); }
+      } else if (t('[data-fpromote]')) {
+        const f = favs.find((x) => x.id === +t('[data-fpromote]').dataset.fpromote); if (!f) return;
+        const b = t('[data-fpromote]'); b.disabled = true;
+        try {
+          const r = await rpc('rd_fav_promote', { p_key: KEY, p_id: f.id }); Object.assign(f, r, { promote_state: 'pending' }); renderFavs();
+          toast('Starting a watch (alerts only)…');
+          const res = await waitCmd(r.command.id, true);
+          f.promote_state = 'done'; renderFavs();
+          toast(res.item && res.item.blocked ? `Watch added, but ${res.item.site} is a known bot-wall site (marked Blocked).` : 'Now watching it. First check within a minute.');
+          await load(); loadFavs();
+        } catch (err) { toast(err.message); loadFavs(); }
+      }
+    });
+  }
   $('#add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target, msg = $('#add-msg'), btn = f.querySelector('button');
@@ -1313,6 +1600,7 @@
       if (!state.flip) state.flip = await api('/api/flip');
       if (!localStorage.getItem('rd-seen')) localStorage.setItem('rd-seen', new Date().toISOString());
       renderFlip(); renderBadge(); renderV2();
+      if (CFG && !favsLoaded) loadFavs();
     } catch (err) {
       if (/Access key/.test(err.message)) {
         document.querySelector('main').innerHTML = '<div class="card" style="margin-top:30px;text-align:center"><p class="t">Access key required</p><p class="d">Open the full Risky Drops link with ?key=… once. This device remembers it.</p></div>';
@@ -1321,7 +1609,9 @@
     }
     $('#boot').classList.add('gone');
   }
-  const route = () => { const [h, hs] = location.hash.slice(1).split('/');
+  const route = () => { const [h, hs, h3] = location.hash.slice(1).split('/');
+    if (h === 'watches' && hs === 'w' && h3) { state.wdetail = decodeURIComponent(h3); show('watches', 'list'); history.replaceState(null, '', location.pathname + location.search + '#watches/w/' + h3); renderWatches(); return; }
+    if (state.wdetail) { state.wdetail = null; if (state.status) renderWatches(); }
     if (h === 'friends') { frDetail = hs && /^\d+$/.test(hs) ? +hs : null; show('friends', hs || null); return; }
     if (['home', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
   if (MODE === 'admin') {

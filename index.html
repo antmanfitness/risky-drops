@@ -115,8 +115,14 @@
   </section>
   <section class="screen" id="tab-watches" hidden>
     <h2 class="section">Watches</h2>
-    <div class="seg" id="w-seg" style="margin-bottom:12px"><button data-v="list" class="on">Watch list</button><button data-v="alerts">Alerts <span class="seg-badge" id="badge"></span></button><button data-v="countdowns">Countdowns</button></div>
+    <div class="seg" id="w-seg" style="margin-bottom:12px"><button data-v="list" class="on">Watch list</button><button data-v="favs" id="w-seg-favs">Favorites <span class="seg-badge fav" id="fav-count"></span></button><button data-v="alerts">Alerts <span class="seg-badge" id="badge"></span></button><button data-v="countdowns">Countdowns</button></div>
     <div id="w-list">
+    <div id="w-detail" hidden>
+      <button type="button" class="back-link" id="wd-back">‹ All watches</button>
+      <div id="wdetail-body"></div>
+    </div>
+    <div id="w-main">
+    <div id="w-dash"></div>
     <div class="card summary" id="summary"></div>
     <div id="watch-list"></div>
     <div class="kicker">Add an item</div>
@@ -130,6 +136,17 @@
       <div class="actions"><button class="btn buy" type="submit">Start watching</button></div>
       <p class="msg" id="add-msg"></p>
     </form>
+    </div>
+    </div>
+    <div id="w-favs" hidden>
+      <div class="card">
+        <p class="t">Save an item</p>
+        <p class="d">Search your watches, past alerts and comps, or paste a product link / Apple part number. Starring only saves it: no checks or alerts until you tap Watch this.</p>
+        <input type="search" id="fav-q" placeholder="Search items, stores, SKUs, or paste a link" autocapitalize="off" spellcheck="false" aria-label="Search items to favorite">
+        <div id="fav-results" class="fav-results"></div>
+      </div>
+      <div class="kicker">Favorites</div>
+      <div id="fav-list"></div>
     </div>
     <div id="w-alerts" hidden>
     <div class="seg" id="alert-filter" style="margin-bottom:10px">
@@ -344,6 +361,19 @@
     <div class="actions"><button class="btn buy" type="submit">Save countdown</button><button class="btn" type="button" data-close>Cancel</button></div>
     <div class="actions"><button class="btn ghost danger" type="button" id="sc-delete" hidden>Delete countdown</button></div>
   </form>
+</div>
+<div class="sheet" id="sheet-diag" hidden role="dialog" aria-modal="true" aria-labelledby="dg-title">
+  <div>
+    <div class="sheet-grab"></div>
+    <p class="t" id="dg-title">Diagnose</p>
+    <div id="dg-body"></div>
+    <div class="actions"><button class="btn warn" type="button" id="dg-retry">Retry now</button><button class="btn" type="button" data-close>Close</button></div>
+  </div>
+</div>
+<div class="cdlg-back" id="cdlg-back" hidden></div>
+<div class="cdlg" id="cdlg" hidden role="alertdialog" aria-modal="true" aria-labelledby="cdlg-t" aria-describedby="cdlg-b">
+  <p class="t" id="cdlg-t"></p><p class="d" id="cdlg-b"></p>
+  <div class="actions"><button class="btn" type="button" id="cdlg-no">Cancel</button><button class="btn danger" type="button" id="cdlg-ok">Delete</button></div>
 </div>
 <div class="sheet" id="sheet-drop" hidden role="dialog" aria-modal="true" aria-labelledby="sd-title">
   <form id="drop-form" autocomplete="off" novalidate>
