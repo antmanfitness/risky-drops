@@ -27,7 +27,7 @@
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
-<svg width="0" height="0" style="position:absolute"><defs><g id="logo"><circle cx="50" cy="50" r="44" fill="none" stroke="#2f80ff" stroke-width="4"/><path d="M50 14 C50 14 26 44 26 60 a24 24 0 0 0 48 0 C74 44 50 14 50 14Z" fill="#fff"/><path d="M53 40 L41 61 H49 L46 76 L60 54 H52 Z" fill="#ff4338"/></g></defs></svg>
+<svg width="0" height="0" style="position:absolute"><defs><g id="logo"><circle cx="50" cy="50" r="44" fill="none" stroke="#22c55e" stroke-width="4"/><path d="M50 14 C50 14 26 44 26 60 a24 24 0 0 0 48 0 C74 44 50 14 50 14Z" fill="#fff"/><path d="M53 40 L41 61 H49 L46 76 L60 54 H52 Z" fill="#ff4338"/></g></defs></svg>
 <header class="app-header">
   <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>
   <h1>Risky Drops</h1>
@@ -35,6 +35,72 @@
   <button class="icon-btn" id="gear" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
 <main>
+  <section class="screen" id="tab-login" hidden>
+    <div class="cd-hero login-hero">
+      <div class="cd-orbit" aria-hidden="true"><svg viewBox="0 0 240 240" aria-hidden="true">
+          <g class="wcs-o wcs-o1"><ellipse cx="120" cy="120" rx="112" ry="40"/><circle class="p" cx="232" cy="120" r="5"/></g>
+          <g class="wcs-o wcs-o2"><circle cx="120" cy="120" r="88"/><circle class="arc" cx="120" cy="120" r="88" pathLength="100"/><circle class="p big" cx="120" cy="32" r="7"/></g>
+          <g class="wcs-o wcs-o3"><ellipse cx="120" cy="120" rx="100" ry="30"/><circle class="p" cx="20" cy="120" r="4"/></g>
+        </svg><div class="cd-hero-logo"><svg viewBox="0 0 100 100"><use href="#logo"/></svg></div></div>
+      <div class="cd-hero-txt"><p class="k">Risky Drops</p><p class="h">Sign in</p><p class="w">One login for everyone. Friends use the username and PIN Krishna gave them.</p></div>
+    </div>
+    <form class="card login-card" id="login-form" autocomplete="on" novalidate>
+      <label class="field">Username<input type="text" name="username" required maxlength="32" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="e.g. dev"></label>
+      <label class="field">PIN or password<input type="password" name="password" required maxlength="72" autocomplete="current-password" placeholder="••••"></label>
+      <div class="actions"><button class="btn buy" type="submit">Log in</button></div>
+      <p class="msg" id="login-msg"></p>
+      <p class="hint">Krishna: your owner link still signs you in as admin, or log in as <b>krishna</b> once you set a password under Friends.</p>
+    </form>
+  </section>
+  <section class="screen" id="tab-friend" hidden>
+    <div class="cd-hero dash-hero">
+      <div class="cd-orbit" aria-hidden="true"><svg viewBox="0 0 240 240" aria-hidden="true">
+          <g class="wcs-o wcs-o1"><ellipse cx="120" cy="120" rx="112" ry="40"/><circle class="p" cx="232" cy="120" r="5"/></g>
+          <g class="wcs-o wcs-o2"><circle cx="120" cy="120" r="88"/><circle class="arc" cx="120" cy="120" r="88" pathLength="100"/><circle class="p big" cx="120" cy="32" r="7"/></g>
+          <g class="wcs-o wcs-o3"><ellipse cx="120" cy="120" rx="100" ry="30"/><circle class="p" cx="20" cy="120" r="4"/></g>
+        </svg><div class="cd-hero-logo"><svg viewBox="0 0 100 100"><use href="#logo"/></svg></div></div>
+      <div class="cd-hero-txt" id="fr-hero"></div>
+    </div>
+    <div class="card">
+      <p class="t">Upload a phone</p>
+      <p class="d">Start with your name, then scan the box label (Serial, IMEI, Part No.). You confirm everything before it saves.</p>
+      <label class="field">Your name<input type="text" id="fr-name" maxlength="60" autocomplete="name" placeholder="Your name"></label>
+      <button class="btn buy scan-big" id="fr-scan" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>Scan box</button>
+    </div>
+    <form class="card" id="rc-form" autocomplete="off" novalidate>
+      <p class="t">Upload a receipt</p>
+      <p class="d">Photo or PDF of the order or store receipt. Only you and Krishna can open it.</p>
+      <div class="field">Receipt file<div class="row"><label class="btn" style="flex:1">Take photo<input type="file" name="photo" accept="image/*" capture="environment" hidden></label><label class="btn" style="flex:1">Choose file<input type="file" name="file" accept="image/*,application/pdf" hidden></label></div></div>
+      <p class="hint" id="rc-file">No file chosen.</p>
+      <div class="grid2">
+        <label class="field">Order number (optional)<input type="text" name="order_number" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="e.g. W1234567890"></label>
+        <label class="field">For which phone? (optional)<select name="phone_id"><option value="">Not linked</option></select></label>
+      </div>
+      <label class="field">Note (optional)<input type="text" name="note" maxlength="500" placeholder="store, date, anything useful"></label>
+      <p class="msg" id="rc-msg"></p>
+      <div class="actions"><button class="btn buy" type="submit">Upload receipt</button></div>
+    </form>
+    <div class="stats" id="fr-stats"></div>
+    <div class="kicker">My phones</div>
+    <div id="fr-phones"></div>
+    <div class="kicker">My receipts</div>
+    <div id="fr-receipts"></div>
+    <div class="actions" style="margin-top:18px"><button class="btn" type="button" id="fr-logout">Log out</button></div>
+    <p class="hint" style="text-align:center">You only see what you uploaded. Krishna sees everything.</p>
+  </section>
+  <section class="screen" id="tab-friends" hidden>
+    <div id="fl-list-view">
+      <div class="row" style="margin:6px 0 0"><h2 class="section grow" style="margin:0">Friends</h2><button class="btn buy" id="fl-new" type="button" style="flex:none">+ New friend</button></div>
+      <div class="card admin-card" id="fl-admin"></div>
+      <div class="seg client-filter" id="fl-filter" role="tablist" aria-label="Friend filter" style="margin:12px 0 10px"><button data-v="active" class="on">Active <span id="fl-n-active"></span></button><button data-v="disabled">Turned off <span id="fl-n-disabled"></span></button></div>
+      <div id="fl-list"></div>
+      <p class="hint">Each friend logs in on the same screen with their username + PIN and only sees their own uploads and receipts (enforced in the database).</p>
+    </div>
+    <div id="fl-detail-view" hidden>
+      <button class="back-btn" type="button" id="fd-back">‹ Friends</button>
+      <div id="fd-body"></div>
+    </div>
+  </section>
   <section class="screen" id="tab-home">
     <div class="cd-hero dash-hero">
       <div class="cd-orbit" aria-hidden="true"><svg viewBox="0 0 240 240" aria-hidden="true">
@@ -108,11 +174,15 @@
   </section>
   <section class="screen" id="tab-sales" hidden>
     <h2 class="section">Sales</h2>
-    <div class="card" id="tracker">
-      <div class="row"><p class="t grow">Profit tracker</p></div>
-      <div class="seg" id="tracker-seg" style="margin-top:10px"><button data-p="week">This week</button><button data-p="month">This month</button><button data-p="all" class="on">All time</button></div>
-      <div class="stats" id="tracker-stats"></div>
-      <p class="f">Sold listings plus alerts you marked sold. Profit = sale − fee − shipping − cost. Weeks start Monday, ET.</p>
+    <div class="card sd" id="tracker">
+      <div class="row sd-top"><p class="t grow">Overview</p><div class="seg sd-range" id="tracker-seg" role="tablist" aria-label="Date range"><button data-p="7">7D</button><button data-p="30">30D</button><button data-p="90">90D</button><button data-p="all" class="on">All</button></div></div>
+      <div class="sd-cards" id="sd-cards"></div>
+      <div class="sd-chart-wrap">
+        <div class="row sd-chart-head"><p class="sd-h grow" id="sd-chart-title">Income over time</p><div class="sd-metric" id="sd-metric" role="tablist" aria-label="Chart metric"><button data-m="rev" class="on">Revenue</button><button data-m="profit">Net profit</button><button data-m="fee">Fees</button><button data-m="cost">Cost</button><button data-m="ship">Shipping</button></div></div>
+        <div class="sd-chart" id="sd-chart"></div>
+      </div>
+      <div class="sd-break-wrap"><p class="sd-h">Revenue to net profit</p><div id="sd-break"></div></div>
+      <p class="f">Real sold listings plus alerts you marked sold. Fees come from each sale’s fee %, shipping from what you entered. Profit = sale − fee − cost − shipping. Ranges are rolling days in ET.</p>
     </div>
     <div class="seg" id="s-seg" style="margin:4px 0 12px"><button data-v="listings" class="on">Listings</button><button data-v="sold">Sold</button><button data-v="comps">Flip comps</button></div>
     <div id="s-listings">
@@ -132,6 +202,11 @@
   </section>
   <section class="screen" id="tab-settings" hidden>
     <h2 class="section">Settings</h2>
+    <div class="card" id="acct-card">
+      <p class="t">Account</p>
+      <p class="d" id="acct-who"></p>
+      <div class="actions"><a class="btn" href="#friends">Friends &amp; logins</a><button class="btn" type="button" id="acct-logout">Log out</button></div>
+    </div>
     <div class="card">
       <p class="t">Appearance</p>
       <div class="seg" id="theme-seg" style="margin-top:10px"><button data-t="light">Light</button><button data-t="dark">Dark</button><button data-t="auto">Auto</button></div>
@@ -200,6 +275,7 @@
   <button data-tab="watches" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M21 12h-2"/></svg><span class="badge" id="tab-badge"></span>Watches</button>
   <button data-tab="phones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Phones</button>
   <button data-tab="sales" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Sales</button>
+  <button data-tab="friends" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>Friends</button>
 </nav>
 <div class="sheet-back" id="sheet-back" hidden></div>
 <div class="sheet" id="sheet-listing" hidden role="dialog" aria-modal="true" aria-labelledby="sl-title">
@@ -287,7 +363,8 @@
     <div class="sheet-grab"></div>
     <p class="t" id="sp-title">Confirm phone</p>
     <p class="d" id="sp-sub">Check every field against the box before saving.</p>
-    <label class="field">Collector<select name="member_id"></select></label>
+    <label class="field" id="sp-coll-wrap">Collector<select name="member_id"></select></label>
+    <label class="field" id="sp-name-wrap" hidden>Your name<input type="text" name="entered_name" maxlength="60" autocomplete="name"></label>
     <label class="field">Serial number<input type="text" name="serial" required maxlength="14" autocapitalize="characters" spellcheck="false" placeholder="e.g. F4KXQ2Y9ZT"></label>
     <div class="grid2">
       <label class="field">IMEI<input type="text" name="imei1" inputmode="numeric" maxlength="15" placeholder="15 digits"></label>
@@ -305,7 +382,10 @@
     <label class="field">SKU / variant (optional)<input type="text" name="sku" maxlength="80" placeholder="e.g. carrier, eSIM, UPC"></label>
     <label class="field">Serial written next to it (handwritten)<input type="text" name="handwritten_serial" maxlength="40" autocapitalize="characters" spellcheck="false" placeholder="what the collector wrote"></label>
     <p class="hint warn" id="sp-hw" hidden></p>
-    <label class="field">Price paid ($)<input type="text" name="price_paid" inputmode="decimal" required placeholder="0.00"></label>
+    <div class="grid2">
+      <label class="field">Price paid ($)<input type="text" name="price_paid" inputmode="decimal" required placeholder="0.00"></label>
+      <label class="field">Order number (optional)<input type="text" name="order_number" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="e.g. W1234567890"></label>
+    </div>
     <label class="field">Notes (optional)<textarea name="notes" rows="2" maxlength="1000"></textarea></label>
     <div class="field">Box photo (optional)<div class="row"><label class="btn" style="flex:1">Add photo<input type="file" name="photo" accept="image/*" capture="environment" hidden></label><img id="sp-thumb" class="thumb" alt="" hidden></div></div>
     <div class="field" id="sp-status-wrap" hidden>Status<div class="seg" id="sp-status"><button type="button" data-s="logged" class="on">Logged</button><button type="button" data-s="returned">Returned</button></div></div>
@@ -314,6 +394,21 @@
     <div class="actions"><button class="btn ghost danger" type="button" id="sp-delete" hidden>Delete entry</button></div>
   </form>
   <datalist id="dl-model"></datalist><datalist id="dl-color"></datalist><datalist id="dl-storage"></datalist>
+</div>
+<div class="sheet" id="sheet-acct" hidden role="dialog" aria-modal="true" aria-labelledby="sa-title">
+  <form id="acct-form" autocomplete="off" novalidate>
+    <div class="sheet-grab"></div>
+    <p class="t" id="sa-title">New friend</p>
+    <p class="d" id="sa-sub">They log in on the main screen with this username and PIN.</p>
+    <label class="field">Name<input type="text" name="name" required maxlength="60" placeholder="e.g. Dev"></label>
+    <label class="field">Username<input type="text" name="username" required maxlength="32" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="e.g. dev"></label>
+    <label class="field" id="sa-pass-label">PIN or password<input type="text" name="pass" maxlength="72" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="4+ characters"></label>
+    <p class="hint" id="sa-pass-hint">4 or more characters. Stored hashed (bcrypt); you can reset it but nobody can read it back. <button class="linkbtn" type="button" id="sa-gen">Make a 6-digit PIN</button></p>
+    <label class="check" id="sa-dis-wrap" hidden><input type="checkbox" name="disabled"> Turn off this login (they're signed out right away)</label>
+    <p class="msg" id="sa-msg"></p>
+    <div class="actions"><button class="btn buy" type="submit">Save</button><button class="btn" type="button" data-close>Cancel</button></div>
+    <div class="actions"><button class="btn ghost danger" type="button" id="sa-delete" hidden>Delete login…</button></div>
+  </form>
 </div>
 <div class="scan-ui" id="scan-ui" hidden role="dialog" aria-modal="true" aria-label="Box scanner">
   <div class="scan-view" id="scan-view"><video id="scan-video" playsinline muted autoplay aria-label="Barcode scanner camera"></video><div class="scan-aim" aria-hidden="true"><span class="scan-line"></span></div></div>

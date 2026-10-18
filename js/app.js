@@ -13,18 +13,44 @@
   const toast = (t) => { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), 2600); };
   // ---- backend: local box server (cookie) or hosted mode (Supabase RPC + access key, commands polled by the box)
   const CFG = window.RD_CONFIG || null;
+  // Sign-in modes (hosted): 'admin' = owner ?key= link or an admin session token (accepted by every app RPC),
+  // 'friend' = friend session (only the rd_me / rd_f_* RPCs accept it; enforced in the database), 'login' = the one login screen.
+  const QS = new URLSearchParams(location.search);
+  let SESSION = null; try { SESSION = JSON.parse(localStorage.getItem('rd-session') || 'null'); } catch (e) { SESSION = null; }
+  const MODE = (() => {
+    if (!CFG) return 'admin';
+    const k = QS.get('key');
+    if (k) { localStorage.setItem('rd-key', k); localStorage.removeItem('rd-session'); SESSION = null; return 'admin'; }
+    if (QS.has('login')) return 'login';
+    if (SESSION && SESSION.token && SESSION.role === 'friend') return 'friend';
+    if (SESSION && SESSION.token && SESSION.role === 'admin') return 'admin';
+    if (localStorage.getItem('rd-key')) return 'admin';
+    return 'login';
+  })();
   const KEY = (() => {
-    if (!CFG) return null;
-    const k = new URLSearchParams(location.search).get('key');
-    if (k) { localStorage.setItem('rd-key', k); return k; }
+    if (!CFG || MODE !== 'admin') return null;
+    if (QS.get('key')) return QS.get('key');
+    if (SESSION && SESSION.role === 'admin') return SESSION.token;
     return localStorage.getItem('rd-key');
   })();
+  const TOKEN = MODE === 'friend' ? SESSION.token : null;
+  document.documentElement.dataset.mode = MODE;
   async function rpc(fn, args) {
     const r = await fetch(`${CFG.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', cache: 'no-store',
       headers: { apikey: CFG.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.message === 'forbidden' ? 'Access key missing or wrong' : (j.message || 'HTTP ' + r.status));
+    if (!r.ok) {
+      if (j.message === 'forbidden' && (TOKEN || (SESSION && SESSION.role === 'admin' && KEY === SESSION.token))) signOut('Your session ended. Log in again.');
+      throw new Error(j.message === 'forbidden' ? 'Access key missing or wrong' : (j.message || 'HTTP ' + r.status));
+    }
     return j;
+  }
+  function signOut(msg) {
+    const t = SESSION && SESSION.token; localStorage.removeItem('rd-session'); localStorage.removeItem('rd-key');
+    if (msg) sessionStorage.setItem('rd-login-msg', msg);
+    const go = () => location.replace(location.pathname);
+    if (t && CFG) fetch(`${CFG.supabaseUrl}/rest/v1/rpc/rd_logout`, { method: 'POST', headers: { apikey: CFG.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: t }) }).finally(go);
+    else go();
   }
   let snap = null, snapAt = 0;
   async function snapshot() {
@@ -76,10 +102,12 @@
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     $('#gear').classList.toggle('on', tab === 'settings');
     $('#ask-open').hidden = tab === 'ask';
-    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + tab);
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + tab + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
     if (sub && tab === 'sales') showSub('s', sub);
+    if (tab === 'sales' && typeof renderTracker === 'function' && ext.loaded) setTimeout(renderTracker, 0);
     if (tab === 'phones' || tab === 'home') loadPhones().catch(() => {});
+    if (tab === 'friends' && typeof loadFriendsView === 'function') { if (sub === undefined) frDetail = null; loadFriendsView().catch((e) => toast(e.message)); }
     if (typeof closeSheet === 'function') closeSheet();
     if (tab === 'watches' && state.wsub === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
     window.scrollTo(0, 0);
@@ -98,6 +126,38 @@
   $('#s-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) showSub('s', b.dataset.v); });
 
   // ---------- watches
+  // Store pills: a watcher's detail like "PS Direct 1000050928: outOfStock $899.0 · Best Buy 6601524: CHECK_STORES $899.99" becomes one compact
+  // scrollable row of pills (green glowing dot = live/in stock, gray = sold out/unknown/blocked); only the selected store's detail is shown.
+  const storeSel = {};
+  const LIVE_RX = /\b(in[ _-]?stock|instock|add[ _-]?to[ _-]?cart|available|orderable|cart=true|buyable=true)\b/i, DEAD_RX = /out[ _-]?of[ _-]?stock|sold[ _-]?out|unavailable|not available|blocked|cart=false|none/i;
+  function parseStores(i) {
+    if (!i.detail || !i.detail.includes(':')) return [];
+    const raw = i.detail.split(' · ').map((x) => x.trim());
+    let lead = ''; const mm = /^(.*[.;!?])\s+([^.;!?:]{1,40}:.*)$/.exec(raw[0]); if (mm) { lead = mm[1]; raw[0] = mm[2]; }
+    const segs = raw.map((x) => /^([^:]{1,40}):\s*(.*)$/.exec(x));
+    if (segs.length < 1 || segs.some((m) => !m)) return [];
+    segs.lead = lead;
+    const out = segs.map((m, n) => {
+      const label = m[1].trim(), rest = m[2].trim(), ref = (label.match(/\b([A-Z0-9]{6,})\b/) || [])[1] || '';
+      const name = label.replace(/\s+[A-Z0-9]{6,}$/, '').replace(/^./, (c) => c.toUpperCase());
+      const price = (rest.match(/\$\s?[\d,]+(?:\.\d+)?/) || rest.match(/price=([\d.]+)/) || [])[0];
+      const mode = rest.replace(/\$\s?[\d,]+(?:\.\d+)?/g, '').replace(/\s+/g, ' ').trim();
+      const live = LIVE_RX.test(rest) && !DEAD_RX.test(rest.replace(LIVE_RX, ''));
+      let link = '';
+      if (/best ?buy/i.test(name) && ref) link = `https://www.bestbuy.com/site/${ref}.p?skuId=${ref}`;
+      else if (/amazon/i.test(name) && /^B0[A-Z0-9]{8}$/.test(ref)) link = `https://www.amazon.com/dp/${ref}`;
+      else if (n === 0) link = safeUrl(i.link);
+      return { key: label, lead, name: name + (segs.filter((x) => x[1].replace(/\s+[A-Z0-9]{6,}$/, '') === m[1].replace(/\s+[A-Z0-9]{6,}$/, '')).length > 1 && ref ? ' ' + ref.slice(-4) : ''), ref, price: price ? (price.startsWith('$') ? price.replace(/\s/g, '') : '$' + price.replace('price=', '')) : '', mode, live, link };
+    });
+    return out;
+  }
+  function storesHtml(i) {
+    const st = parseStores(i);
+    if (!st.length) return i.detail ? `<p class="d">${esc(i.detail)}</p>` : '';
+    const selKey = storeSel[i.id] && st.find((x) => x.key === storeSel[i.id]) ? storeSel[i.id] : (st.find((x) => x.live) || st[0]).key, s = st.find((x) => x.key === selKey);
+    return `${st[0].lead ? `<p class="d">${esc(st[0].lead)}</p>` : ''}<div class="spills" role="tablist" aria-label="Stores">${st.map((x) => `<button type="button" role="tab" aria-selected="${x.key === selKey}" class="spill ${x.key === selKey ? 'on' : ''}" data-store="${esc(i.id)}" data-skey="${esc(x.key)}"><i class="${x.live ? 'live' : ''}"></i>${esc(x.name)}</button>`).join('')}</div>
+      <p class="sline"><b>${s.live ? 'Live' : 'Not live'}</b>${s.price ? `<span>${esc(s.price)}</span>` : ''}${s.mode ? `<span>${esc(s.mode)}</span>` : ''}<span>checked ${i.last_check ? esc(et(i.last_check)) : '—'}</span>${s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener noreferrer">Open ↗</a>` : ''}</p>`;
+  }
   function renderWatches() {
     const items = state.status?.items || [];
     const lastSync = state.syncedAt || state.status?.generated;
@@ -125,7 +185,7 @@
       return `<div class="card ${i.status === 'in_stock' ? 'in-stock-card' : ''}">
         <div class="row"><p class="t grow">${esc(i.name)}</p><span class="pill ${esc(i.status)}">${esc(LABEL[i.status] || i.status)}</span></div>
         <p class="d">${esc(i.sub)}</p>
-        ${i.detail ? `<p class="d">${esc(i.detail)}</p>` : ''}
+        ${storesHtml(i)}
         ${i.extra ? `<p class="f">${esc(i.extra)}</p>` : ''}
         <div class="meta"><span class="row" style="gap:6px"><span class="dot ${i.alive ? 'on' : (i.status === 'scheduled' || i.paused || (i.status === 'blocked' && !i.builtin) ? '' : 'off')}"></span>${esc(procTxt)}</span>
           <span>Last check: ${i.last_check ? esc(et(i.last_check)) : '—'}${i.stale ? ' (stale)' : ''}</span></div>
@@ -135,6 +195,7 @@
     }).join('') || '<p class="empty">No watches yet.</p>';
   }
   $('#watch-list').addEventListener('click', async (e) => {
+    const sp = e.target.closest('button[data-store]'); if (sp) { storeSel[sp.dataset.store] = sp.dataset.skey; renderWatches(); return; }
     const b = e.target.closest('button[data-act]'); if (!b) return;
     const { act, id } = b.dataset;
     if (act === 'delete' && !confirm('Stop and remove this watch?')) return;
@@ -255,8 +316,15 @@
   const compact = (ms) => { const t = split(ms); return (t.d ? `${t.d}d ` : '') + `${pad(t.h)}h ${pad(t.m)}m ${pad(t.s)}s`; };
   const digits = (iso) => { const t = split(new Date(iso) - Date.now());
     return `<div class="cd-digits" data-digits="${esc(iso)}"><span><b>${t.d}</b><small>days</small></span><span><b>${pad(t.h)}</b><small>hrs</small></span><span><b>${pad(t.m)}</b><small>min</small></span><span><b>${pad(t.s)}</b><small>sec</small></span></div>`; };
-  const need = () => { if (!CFG) throw new Error('Listings and countdowns need the hosted app link.'); if (!KEY) throw new Error('Access key missing. Open the full link with ?key= once.'); };
-  const call = async (fn, args) => { need(); const r = await rpc(fn, { p_key: KEY, ...args }); return r; };
+  const need = () => { if (!CFG) throw new Error('Listings and countdowns need the hosted app link.'); if (!KEY && !TOKEN) throw new Error('Access key missing. Open the full link with ?key= once.'); };
+  // friend sessions use the scoped rd_f_* RPCs (server forces their own member and only returns their own rows)
+  const FRIEND_FN = { rd_scan_submit: 'rd_f_scan_submit', rd_scan_get: 'rd_f_scan_get', rd_phone_save: 'rd_f_phone_save', rd_phone_photo: 'rd_f_phone_photo' };
+  const call = async (fn, args) => {
+    need();
+    if (TOKEN) { const f = FRIEND_FN[fn]; if (!f) throw new Error('Not available on a friend account');
+      const a = { ...args }; delete a.p_member_id; if (fn === 'rd_phone_save') delete a.p_id; return rpc(f, { p_token: TOKEN, ...a }); }
+    return rpc(fn, { p_key: KEY, ...args });
+  };
   async function loadExt() {
     if (!CFG || !KEY) return;
     const d = await rpc('rd_app_data', { p_key: KEY });
@@ -346,17 +414,95 @@
   $('#sold-list').addEventListener('click', (e) => { const b = e.target.closest('[data-sedit]'); if (!b) return; const [k, id] = b.dataset.sedit.split(':');
     if (k === 'listing') openListing(ext.listings.find((l) => l.id === +id));
     else { const s = ext.sales.find((x) => x.alert_id === id); const a = state.alerts.find((x) => x.id === id) || { id, item: s?.item, ts: s?.sold_at }; openSale(a); } });
+  // ---------- Sales overview (Stripe-style): range picker drives 3 cards, dotted line chart (+ dashed estimate) and the revenue→net waterfall
+  let sdMetric = 'rev', sdSel = null;
+  const SD_LABEL = { rev: 'Revenue', profit: 'Net profit', fee: 'Fees', cost: 'Cost', ship: 'Shipping' };
+  const soldRows = () => [...ext.listings.filter((l) => l.status === 'sold').map((l) => ({ ...l, when: l.sold_at || l.updated_at })), ...ext.sales.map((x) => ({ ...x, when: x.sold_at }))].filter((x) => x.when);
+  const dayLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+  const dLab = (k) => dayLabel.format(new Date(k + 'T12:00:00Z'));
+  const addDays = (k, n) => new Date(Date.parse(k + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);
   function renderTracker() {
-    const now = new Date(), today = etKey(now), wd = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7;
-    const monday = new Date(Date.parse(today + 'T12:00:00Z') - wd * 86400000).toISOString().slice(0, 10);
-    const inP = (iso) => { if (!iso) return false; const k = etKey(new Date(iso)); return trackerPeriod === 'all' || (trackerPeriod === 'month' ? k.slice(0, 7) === today.slice(0, 7) : k >= monday); };
-    const all = [...ext.listings.filter((l) => l.status === 'sold').map((l) => ({ ...l, when: l.sold_at || l.updated_at })), ...ext.sales.map((s) => ({ ...s, when: s.sold_at }))].filter((x) => inP(x.when));
-    const t = all.reduce((a, x) => { const r = pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost); a.rev += +x.price; a.fee += r.fee; a.ship += +x.shipping; a.cost += +x.cost; a.profit += r.profit; return a; }, { rev: 0, fee: 0, ship: 0, cost: 0, profit: 0 });
-    $('#tracker-stats').innerHTML = `<div class="wide"><small>Total profit · ${all.length} sale${all.length === 1 ? '' : 's'}</small><b class="${cls(r2(t.profit))}">${money(r2(t.profit))}</b></div>
-      <div><small>Revenue</small><b>${money(r2(t.rev))}</b></div><div><small>Fees</small><b>${money(r2(t.fee))}</b></div>
-      <div><small>Cost</small><b>${money(r2(t.cost))}</b></div><div><small>Shipping</small><b>${money(r2(t.ship))}</b></div>`;
+    if (!$('#sd-cards')) return;
+    const today = etKey(new Date()), from = trackerPeriod === 'all' ? '' : addDays(today, -(+trackerPeriod - 1));
+    const all = soldRows(), rows = all.filter((x) => etKey(new Date(x.when)) >= from);
+    const t = rows.reduce((a, x) => { const r = pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost); a.rev += +x.price; a.fee += r.fee; a.ship += +x.shipping; a.cost += +x.cost; a.profit += r.profit; return a; }, { rev: 0, fee: 0, ship: 0, cost: 0, profit: 0 });
+    Object.keys(t).forEach((k) => (t[k] = r2(t[k])));
+    const active = ext.listings.filter((l) => l.status === 'active'), unsoldCost = r2(active.reduce((a, l) => a + +l.cost, 0));
+    const n = rows.length, rangeTxt = trackerPeriod === 'all' ? 'all time' : `last ${trackerPeriod} days`;
+    $('#sd-cards').innerHTML = `<div class="sd-card"><small>Money invested</small><b>${money(t.cost)}</b><span>item cost of ${n} sale${n === 1 ? '' : 's'}${active.length ? ` · +${money(unsoldCost)} in ${active.length} unsold` : ''}</span></div>
+      <div class="sd-card"><small>Money made</small><b>${money(t.rev)}</b><span>net profit <b class="${cls(t.profit)}" style="display:inline;font-size:inherit">${money(t.profit)}</b></span></div>
+      <div class="sd-card"><small>Money lost</small><b>${money(r2(t.fee + t.ship))}</b><span>fees ${money(t.fee)} · shipping ${money(t.ship)}</span></div>`;
+    // daily buckets (ET) for the chart; each dot = a day with real sales
+    const byDay = new Map();
+    for (const x of rows) { const k = etKey(new Date(x.when)), r = pnl(+x.price, +x.fee_pct, +x.shipping, +x.cost), d = byDay.get(k) || { k, n: 0, rev: 0, fee: 0, cost: 0, ship: 0, profit: 0 };
+      d.n++; d.rev += +x.price; d.fee += r.fee; d.cost += +x.cost; d.ship += +x.shipping; d.profit += r.profit; byDay.set(k, d); }
+    const pts = [...byDay.values()].sort((a, b) => a.k.localeCompare(b.k)).map((d) => ({ ...d, rev: r2(d.rev), fee: r2(d.fee), cost: r2(d.cost), ship: r2(d.ship), profit: r2(d.profit) }));
+    $('#sd-chart-title').textContent = `${SD_LABEL[sdMetric]} over time · ${rangeTxt}`;
+    renderChart(pts, projection(all, active, today));
+    // waterfall: revenue − fees − cost − shipping = net profit
+    if (!n) { $('#sd-break').innerHTML = `<p class="sd-empty">No sales in this range yet. Mark a listing or alert sold and it shows up here.</p>`; return; }
+    const lo = Math.min(0, t.profit), hi = Math.max(t.rev, 0.01), sc = (v) => ((v - lo) / (hi - lo)) * 100;
+    let run = t.rev; const steps = [['Revenue', 'rev', 0, t.rev, t.rev]];
+    for (const [lab, v] of [['Platform fees', t.fee], ['Item cost', t.cost], ['Shipping', t.ship]]) { steps.push([lab, 'neg', run - v, run, -v]); run = r2(run - v); }
+    steps.push(['Net profit', 'net' + (t.profit < 0 ? ' loss' : ''), Math.min(0, t.profit), Math.max(0, t.profit), t.profit]);
+    $('#sd-break').innerHTML = `<div class="wf">${steps.map(([lab, c, a, b, v]) => `<div class="wf-row ${c}"><span>${lab}</span><div class="wf-track"><i style="left:${sc(Math.min(a, b)).toFixed(2)}%;width:${Math.max(0.8, sc(Math.max(a, b)) - sc(Math.min(a, b))).toFixed(2)}%"></i></div><b class="${c.startsWith('net') ? cls(v) : ''}">${c === 'neg' ? '−' + money(-v) : money(v)}</b></div>`).join('')}</div>`;
   }
+  // Estimate: unsold active listings, priced at recent real sale prices (same item name if sold before, else its own list price), spaced at the recent sale cadence.
+  function projection(all, active, today) {
+    const recent = all.filter((x) => etKey(new Date(x.when)) >= addDays(today, -89)).sort((a, b) => String(a.when).localeCompare(String(b.when)));
+    if (recent.length < 3 || !active.length) return null;
+    const days = (Date.parse(recent[recent.length - 1].when) - Date.parse(recent[0].when)) / 86400000, gap = Math.max(1, days / (recent.length - 1));
+    const avgOf = (item) => { const m = recent.filter((x) => x.item.trim().toLowerCase() === item.trim().toLowerCase()); return m.length ? m.reduce((a, x) => a + +x.price, 0) / m.length : null; };
+    const out = []; let k = today;
+    active.slice(0, 8).forEach((l, i) => { const price = r2(avgOf(l.item) ?? +l.price), r = pnl(price, +l.fee_pct, +l.shipping, +l.cost); k = addDays(today, Math.round(gap * (i + 1)));
+      out.push({ k, n: 1, est: true, item: l.item, rev: price, fee: r.fee, cost: +l.cost, ship: +l.shipping, profit: r.profit }); });
+    return { pts: out, gap: r2(gap), count: active.length };
+  }
+  function renderChart(pts, proj) {
+    const el = $('#sd-chart');
+    if (!pts.length) { el.innerHTML = `<p class="sd-empty">No sales in this range yet. Real sales only; nothing is made up.</p>`; return; }
+    const m = sdMetric, P = (proj && ['rev', 'profit'].includes(m)) ? proj.pts : [];
+    const W = Math.max(300, Math.round(el.clientWidth || 340)), H = 210, L = 44, R = 12, T = 22, B = 26;
+    const keys = [...pts.map((p) => p.k), ...P.map((p) => p.k)], t0 = Date.parse(keys[0] + 'T12:00:00Z'), t1 = Date.parse(keys[keys.length - 1] + 'T12:00:00Z');
+    const vals = [...pts, ...P].map((p) => p[m]); let vmin = Math.min(0, ...vals), vmax = Math.max(...vals, 0);
+    if (vmax === vmin) vmax = vmin + 1; const pad = (vmax - vmin) * 0.12; vmax += pad; if (vmin < 0) vmin -= pad;
+    const x = (k) => t1 === t0 ? (L + (W - L - R) / 2) : L + ((Date.parse(k + 'T12:00:00Z') - t0) / (t1 - t0)) * (W - L - R);
+    const y = (v) => T + (1 - (v - vmin) / (vmax - vmin)) * (H - T - B);
+    const ticks = [0, 1, 2, 3].map((i) => vmin + (vmax - vmin) * i / 3);
+    const xl = [...new Set([keys[0], keys[Math.floor((keys.length - 1) / 2)], keys[keys.length - 1]])];
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.k).toFixed(1)},${y(p[m]).toFixed(1)}`).join('');
+    const area = pts.length > 1 ? `${line}L${x(pts[pts.length - 1].k).toFixed(1)},${y(Math.max(vmin, 0)).toFixed(1)}L${x(pts[0].k).toFixed(1)},${y(Math.max(vmin, 0)).toFixed(1)}Z` : '';
+    const last = pts[pts.length - 1], pline = P.length ? `M${x(last.k).toFixed(1)},${y(last[m]).toFixed(1)}` + P.map((p) => `L${x(p.k).toFixed(1)},${y(p[m]).toFixed(1)}`).join('') : '';
+    let hiI = -1, loI = -1; if (pts.length > 1) { hiI = 0; loI = 0; pts.forEach((p, i) => { if (p[m] > pts[hiI][m]) hiI = i; if (p[m] < pts[loI][m]) loI = i; }); if (pts[hiI][m] === pts[loI][m]) { hiI = -1; loI = -1; } }
+    const tagX = (k) => Math.min(W - R - 4, Math.max(L + 4, x(k)));
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(SD_LABEL[m])} by day">
+      <defs><linearGradient id="sdfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="rgb(var(--accent-rgb))" stop-opacity=".22"/><stop offset="1" stop-color="rgb(var(--accent-rgb))" stop-opacity="0"/></linearGradient></defs>
+      <g class="grid">${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`).join('')}</g>
+      <g class="axis">${ticks.map((v) => `<text x="${L - 6}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end">${esc(short$(v))}</text>`).join('')}
+        ${xl.map((k) => `<text x="${x(k).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(dLab(k))}</text>`).join('')}</g>
+      ${area ? `<path class="area" d="${area}"/>` : ''}<path class="ln" d="${line}"/>${pline ? `<path class="proj" d="${pline}"/>` : ''}
+      ${P.length ? `<text class="tag pj" x="${tagX(P[P.length - 1].k)}" y="${(y(P[P.length - 1][m]) - 10).toFixed(1)}" text-anchor="end">Estimate</text>` : ''}
+      ${hiI >= 0 ? `<text class="tag" x="${tagX(pts[hiI].k)}" y="${(y(pts[hiI][m]) - 10).toFixed(1)}" text-anchor="middle">High ${esc(short$(pts[hiI][m]))}</text>` : ''}
+      ${loI >= 0 ? `<text class="tag lo" x="${tagX(pts[loI].k)}" y="${(y(pts[loI][m]) + 18).toFixed(1)}" text-anchor="middle">Low ${esc(short$(pts[loI][m]))}</text>` : ''}
+      ${P.map((p, i) => `<circle class="pt pj" cx="${x(p.k).toFixed(1)}" cy="${y(p[m]).toFixed(1)}" r="3.5" data-pi="p${i}"/>`).join('')}
+      ${pts.map((p, i) => `<circle class="pt${i === hiI ? ' hi' : ''}${i === loI ? ' lo' : ''}" cx="${x(p.k).toFixed(1)}" cy="${y(p[m]).toFixed(1)}" r="${i === hiI || i === loI ? 5.5 : 4}" data-pi="${i}"/>`).join('')}
+      ${[...pts.map((p, i) => [p, String(i)]), ...P.map((p, i) => [p, 'p' + i])].map(([p, id]) => `<circle class="hit" cx="${x(p.k).toFixed(1)}" cy="${y(p[m]).toFixed(1)}" r="14" data-pi="${id}"/>`).join('')}
+    </svg><div class="sd-tip" hidden></div>
+    ${P.length ? `<p class="hint">Dashed line = estimate, not real sales: ${proj.count} unsold listing${proj.count === 1 ? '' : 's'} at recent real sale prices, one about every ${proj.gap} day${proj.gap === 1 ? '' : 's'}.</p>` : (proj === null && ['rev', 'profit'].includes(m) ? '<p class="hint">Estimate appears once there are 3+ sales in the last 90 days and at least one active listing.</p>' : '')}`;
+    const tip = el.querySelector('.sd-tip'), svg = el.querySelector('svg');
+    const showTip = (id) => { const p = id.startsWith('p') ? P[+id.slice(1)] : pts[+id]; if (!p) return; const c = svg.querySelector(`circle.pt[data-pi="${id}"]`);
+      svg.querySelectorAll('circle.pt.sel').forEach((n) => n.classList.remove('sel')); c.classList.add('sel');
+      const bx = svg.getBoundingClientRect(), cb = c.getBoundingClientRect(), eb = el.getBoundingClientRect();
+      tip.style.top = (cb.top - eb.top) + 'px';
+      tip.innerHTML = `<small>${p.est ? 'Estimate · ' + esc(p.item) + ' · ' : ''}${esc(dLab(p.k))}${p.est ? '' : ` · ${p.n} sale${p.n === 1 ? '' : 's'}`}</small><b>${esc(SD_LABEL[m])} ${money(p[m])}</b>
+        <small>Revenue ${money(p.rev)} · Fees ${money(p.fee)}</small><small>Cost ${money(p.cost)} · Ship ${money(p.ship)} · Net ${money(p.profit)}</small>`; tip.hidden = false; const half = tip.offsetWidth / 2; tip.style.left = Math.min(eb.width - half, Math.max(half, cb.left - eb.left + cb.width / 2)) + 'px'; sdSel = id; void bx; };
+    svg.addEventListener('pointerover', (e) => { const c = e.target.closest('[data-pi]'); if (c) showTip(c.dataset.pi); });
+    svg.addEventListener('click', (e) => { const c = e.target.closest('[data-pi]'); if (c) showTip(c.dataset.pi); else { tip.hidden = true; svg.querySelectorAll('circle.pt.sel').forEach((n) => n.classList.remove('sel')); } });
+    svg.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') tip.hidden = true; });
+  }
+  const short$ = (v) => { const a = Math.abs(v), sg = v < 0 ? '−' : ''; return sg + '$' + (a >= 10000 ? (a / 1000).toFixed(0) + 'k' : a >= 1000 ? (a / 1000).toFixed(1) + 'k' : a.toFixed(0)); };
   $('#tracker-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; trackerPeriod = b.dataset.p; document.querySelectorAll('#tracker-seg button').forEach((x) => x.classList.toggle('on', x === b)); renderTracker(); });
+  $('#sd-metric').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; sdMetric = b.dataset.m; document.querySelectorAll('#sd-metric button').forEach((x) => x.classList.toggle('on', x === b)); renderTracker(); });
   const setStatus = (s) => document.querySelectorAll('#sl-status button').forEach((b) => b.classList.toggle('on', b.dataset.s === s));
   const curStatus = () => $('#sl-status button.on').dataset.s;
   $('#sl-status').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { setStatus(b.dataset.s); } });
@@ -686,7 +832,7 @@
 
   // ================= Phones: box scanner, phone log, collectors & payouts, part lookup =================
   const ph = { phones: [], parts: [], dupes: [], loaded: false, filter: null, q: '' };
-  async function loadPhones() { if (!CFG || !KEY) return; const d = await rpc('rd_phones', { p_key: KEY }); Object.assign(ph, d, { loaded: true }); renderPhones(); renderDash(); }
+  async function loadPhones() { if (TOKEN) return loadFriend(); if (!CFG || !KEY) return; const d = await rpc('rd_phones', { p_key: KEY }); Object.assign(ph, d, { loaded: true }); renderPhones(); renderDash(); }
   const C = window.RDClassify;
   const maskSerial = (s) => s ? s.slice(0, 3) + '•••' + s.slice(-2) : '';
   const phoneName = (p) => [p.model, p.color, p.storage].filter(Boolean).join(' · ') || (p.part_number ? p.part_number : 'Unknown model');
@@ -768,7 +914,7 @@
       const img = await RDScanner.compress(f, 1600, 0.8);
       const job = await call('rd_scan_submit', { p_member_id: me()?.id ?? null, p_image: img });
       for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 2500)); const j = await rpc('rd_scan_get', { p_key: KEY, p_id: job.id }).catch(() => null);
+        await new Promise((r) => setTimeout(r, 2500)); const j = await call('rd_scan_get', { p_id: job.id }).catch(() => null);
         if (!j) continue; if (j.status === 'pending' && i > 12) $('#scan-last').textContent = 'Waiting for the box to pick this up. Is it online?';
         if (j.status === 'running') $('#scan-last').textContent = 'Reading the label…';
         if (j.status === 'error') { $('#scan-last').textContent = j.error; return; }
@@ -790,7 +936,7 @@
   function partHint() {
     const f = $('#phone-form'), pn = f.part_number.value.trim().toUpperCase(), k = partOf(pn);
     if (k) { $('#sp-part').textContent = `Lookup: ${[k.model, k.color, k.storage].filter(Boolean).join(' · ')}`; $('#sp-savepart').hidden = true; }
-    else { $('#sp-part').textContent = pn ? 'Not in the lookup. Pick or type model / color / storage below.' : ''; $('#sp-savepart').hidden = !pn; }
+    else { $('#sp-part').textContent = pn ? 'Not in the lookup. Pick or type model / color / storage below.' : ''; $('#sp-savepart').hidden = !pn || !!TOKEN; }
     return k;
   }
   function imeiHint() {
@@ -807,6 +953,8 @@
     phEdit = p || null; phPhoto = null; const f = $('#phone-form'); f.reset(); const s = scanned || {};
     f.member_id.innerHTML = ext.members.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
     f.member_id.value = String(p ? (p.member_id ?? '') : (me()?.id ?? ''));
+    $('#sp-coll-wrap').hidden = !!TOKEN; $('#sp-name-wrap').hidden = !TOKEN; f.entered_name.value = TOKEN ? ($('#fr-name').value.trim() || fr.account?.name || '') : '';
+    f.order_number.value = p ? (p.order_number || '') : '';
     $('#sp-title').textContent = p ? 'Edit phone' : 'Confirm phone'; $('#sp-sub').textContent = p ? `Logged ${et(p.created_at)} by ${p.member || 'no collector'}` : 'Check every field against the box before saving.';
     for (const k of ['serial', 'imei1', 'imei2', 'part_number', 'model', 'color', 'storage', 'sku', 'handwritten_serial', 'notes']) f[k].value = p ? (p[k] || '') : (s[k] || '');
     if (!p && s.upc) f.sku.value = 'UPC ' + s.upc;
@@ -816,7 +964,7 @@
     else if (!p && s.ai) { f.model.value = s.ai.model || ''; f.color.value = s.ai.color || ''; f.storage.value = s.ai.storage || ''; }
     if (!p && s.ai?.notes?.length) $('#sp-sub').textContent = 'AI read: ' + s.ai.notes.join('; ') + '. Check every value.';
     $('#sp-thumb').hidden = true; $('#sp-status-wrap').hidden = !p; setPhStatus(p ? p.status : 'logged');
-    if (p?.has_photo) rpc('rd_phone_photo', { p_key: KEY, p_id: p.id }).then((d) => { if (d) { $('#sp-thumb').src = d; $('#sp-thumb').hidden = false; } }).catch(() => {});
+    if (p?.has_photo) call('rd_phone_photo', { p_id: p.id }).then((d) => { if (d) { $('#sp-thumb').src = d; $('#sp-thumb').hidden = false; } }).catch(() => {});
     $('#sp-delete').hidden = !p; $('#sp-rescan').hidden = !!p; $('#sp-msg').textContent = ''; imeiHint(); hwHint(); sheet('#sheet-phone');
   }
   $('#phone-form').addEventListener('input', (e) => {
@@ -836,12 +984,15 @@
     if (err) { msg.textContent = err; return; }
     const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
     try {
-      const r = await call('rd_phone_save', { p_id: phEdit ? phEdit.id : null, p_phone: { member_id: f.member_id.value, serial, imei1: i1, imei2: i2, part_number: f.part_number.value, model: f.model.value, color: f.color.value,
-        storage: f.storage.value, sku: f.sku.value, handwritten_serial: f.handwritten_serial.value, price_paid: price, notes: f.notes.value, status: phEdit ? $('#sp-status button.on').dataset.s : 'logged', photo: phPhoto } });
+      const body = { member_id: f.member_id.value, serial, imei1: i1, imei2: i2, part_number: f.part_number.value, model: f.model.value, color: f.color.value,
+        storage: f.storage.value, sku: f.sku.value, handwritten_serial: f.handwritten_serial.value, price_paid: price, notes: f.notes.value, order_number: f.order_number.value,
+        status: phEdit ? $('#sp-status button.on').dataset.s : 'logged', photo: phPhoto };
+      if (TOKEN) { if (!f.entered_name.value.trim()) { msg.className = 'msg err'; msg.textContent = 'Enter your name.'; btn.disabled = false; return; } body.entered_name = f.entered_name.value.trim(); delete body.member_id; delete body.status; }
+      const r = await call('rd_phone_save', { p_id: phEdit ? phEdit.id : null, p_phone: body });
       if (r && r.error) { msg.className = 'msg err'; msg.textContent = r.error; btn.disabled = false; return; }
-      if (f.save_part.checked && f.part_number.value.trim() && f.model.value.trim() && !partOf(f.part_number.value)) {
+      if (!TOKEN && f.save_part.checked && f.part_number.value.trim() && f.model.value.trim() && !partOf(f.part_number.value)) {
         await call('rd_part_save', { p_part: { part_number: f.part_number.value, model: f.model.value, color: f.color.value, storage: f.storage.value, source: 'added in app by ' + (me()?.name || 'member') } }).catch((x) => toast('Lookup not saved: ' + x.message)); }
-      closeSheet(); toast(phEdit ? 'Phone updated' : 'Phone logged'); await loadPhones();
+      closeSheet(); toast(phEdit ? 'Phone updated' : 'Phone logged'); await loadPhones(); if (!TOKEN && state.tab === 'friends') loadFriendsView().catch(() => {});
     } catch (err2) { msg.className = 'msg err'; msg.textContent = err2.message; }
     btn.disabled = false;
   });
@@ -884,6 +1035,202 @@
     const b = e.target.closest('[data-go]'); if (!b) return; const [t, sub] = b.dataset.go.split('/'); show(t, sub);
   });
 
+  // ================= Accounts: one login screen, friend mode (own uploads + receipts only), admin Friends view =================
+  const fr = { account: null, phones: [], receipts: [] };
+  let frDetail = null, flFilter = 'active', flAccounts = [], fdData = null, acctEdit = null, flMenu = null;
+  const fmtBytes = (n) => !n ? '' : n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const onlyScreen = (id) => { document.querySelectorAll('.screen').forEach((x) => (x.hidden = x.id !== id)); $('.tabbar').hidden = true; $('#ask-open').hidden = true; $('#gear').hidden = true; };
+  function bootOther() {
+    state.tab = MODE;
+    if (MODE === 'login') {
+      onlyScreen('tab-login'); $('#updated').textContent = '';
+      const m = sessionStorage.getItem('rd-login-msg'); if (m) { $('#login-msg').className = 'msg'; $('#login-msg').textContent = m; sessionStorage.removeItem('rd-login-msg'); }
+      $('#boot').classList.add('gone'); setTimeout(() => $('#login-form').username.focus({ preventScroll: true }), 300);
+    } else if (MODE === 'friend') {
+      onlyScreen('tab-friend'); $('#updated').textContent = SESSION.name ? 'Signed in as ' + SESSION.name : '';
+      $('#fr-name').value = localStorage.getItem('rd-fr-name') || SESSION.name || '';
+      loadFriend().catch((e) => toast(e.message)).finally(() => $('#boot').classList.add('gone'));
+      setInterval(() => { if (document.visibilityState === 'visible' && !openSheet && $('#scan-ui').hidden) loadFriend().catch(() => {}); }, 30000);
+    }
+  }
+  $('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target, msg = $('#login-msg'), btn = f.querySelector('button[type=submit]');
+    if (!f.username.value.trim() || !f.password.value) { msg.className = 'msg err'; msg.textContent = 'Enter your username and PIN.'; return; }
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Signing in…';
+    try {
+      const r = await rpc('rd_login', { p_username: f.username.value.trim(), p_pass: f.password.value });
+      if (!r || r.error || !r.token) throw new Error((r && r.error) || 'Could not sign in');
+      localStorage.setItem('rd-session', JSON.stringify({ token: r.token, role: r.role, name: r.name, username: r.username, member_id: r.member_id }));
+      if (r.role === 'admin') localStorage.removeItem('rd-key');
+      location.replace(location.pathname);
+    } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; btn.disabled = false; }
+  });
+  // ---------- friend mode
+  async function loadFriend() {
+    const d = await rpc('rd_me', { p_token: TOKEN });
+    Object.assign(fr, d); ph.parts = d.parts || []; ph.phones = d.phones || []; renderFriend();
+  }
+  function renderFriend() {
+    const name = fr.account?.name || SESSION?.name || '';
+    const logged = fr.phones.filter((p) => p.status === 'logged'), owed = r2(logged.reduce((a, p) => a + +p.price_paid, 0));
+    $('#fr-hero').innerHTML = `<p class="k">Risky Drops · friend account</p><p class="h">Hi ${esc(name)}</p><p class="w">@${esc(fr.account?.username || '')} · ${fr.phones.length} phone${fr.phones.length === 1 ? '' : 's'} uploaded</p>`;
+    $('#fr-stats').innerHTML = `<div class="wide"><small>Payout owed to you · ${logged.length} phone${logged.length === 1 ? '' : 's'}</small><b>${money(owed)}</b></div>
+      <div><small>Phones uploaded</small><b>${fr.phones.length}</b></div><div><small>Receipts</small><b>${fr.receipts.length}</b></div>`;
+    $('#fr-phones').innerHTML = fr.phones.map((p) => `<div class="card"><div class="row"><p class="t grow">${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
+      <p class="d">S/N ${esc(p.serial)}${p.imei1 ? ' · IMEI ' + esc(p.imei1) : ''}${p.order_number ? ' · Order ' + esc(p.order_number) : ''}</p>
+      <p class="f">${esc(et(p.created_at))}${p.status === 'returned' ? ' · returned' : ' · logged'}${p.has_photo ? ' · 📷' : ''}</p></div>`).join('') || '<p class="empty">Nothing uploaded yet. Tap Scan box.</p>';
+    $('#fr-receipts').innerHTML = fr.receipts.length ? `<div class="card">${fr.receipts.map((x) => `<div class="rc-row"><span class="grow"><b>${esc(x.file_name || (x.mime === 'application/pdf' ? 'Receipt (PDF)' : 'Receipt photo'))}</b><small>${esc(et(x.created_at))}${x.order_number ? ' · Order ' + esc(x.order_number) : ''}${x.phone_id ? ' · ' + esc(phoneName(fr.phones.find((p) => p.id === x.phone_id) || {})) : ''} · ${fmtBytes(x.size_bytes)}</small></span><button class="btn" data-rview="${x.id}">View</button><button class="btn ghost danger" data-rdel="${x.id}" aria-label="Delete receipt">✕</button></div>`).join('')}</div>` : '<p class="empty">No receipts yet.</p>';
+    const sel = $('#rc-form').phone_id, cur = sel.value;
+    sel.innerHTML = '<option value="">Not linked</option>' + fr.phones.map((p) => `<option value="${p.id}">${esc(phoneName(p))} · ${esc(p.serial.slice(-5))}</option>`).join(''); sel.value = cur;
+    const uniq = (k) => [...new Set([...ph.parts.map((x) => x[k]), ...ph.phones.map((x) => x[k])].filter(Boolean))].sort();
+    $('#dl-model').innerHTML = uniq('model').map((v) => `<option value="${esc(v)}">`).join(''); $('#dl-color').innerHTML = uniq('color').map((v) => `<option value="${esc(v)}">`).join('');
+    $('#dl-storage').innerHTML = [...new Set([...uniq('storage'), '128GB', '256GB', '512GB', '1TB', '2TB'])].map((v) => `<option value="${esc(v)}">`).join('');
+  }
+  $('#fr-name').addEventListener('change', (e) => localStorage.setItem('rd-fr-name', e.target.value.trim()));
+  $('#fr-scan').addEventListener('click', () => { if (!$('#fr-name').value.trim()) { toast('Enter your name first'); $('#fr-name').focus(); return; } localStorage.setItem('rd-fr-name', $('#fr-name').value.trim()); openScanner(); });
+  $('#fr-logout').addEventListener('click', () => { if (confirm('Log out of Risky Drops on this device?')) signOut('Logged out.'); });
+  let rcFile = null;
+  const readAsDataUrl = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read that file')); r.readAsDataURL(f); });
+  async function pickReceipt(f) {
+    if (!f) return; $('#rc-msg').textContent = '';
+    try {
+      if (f.type === 'application/pdf') { if (f.size > 3 * 1024 * 1024) throw new Error('PDF is over 3 MB. Take a photo instead.'); rcFile = { data: await readAsDataUrl(f), name: f.name, mime: 'application/pdf' }; }
+      else if (/^image\//.test(f.type)) rcFile = { data: await RDScanner.compress(f, 2000, 0.82), name: f.name || 'receipt.jpg', mime: 'image/jpeg' };
+      else throw new Error('Pick a photo or a PDF');
+      $('#rc-file').textContent = `${rcFile.name} · ${fmtBytes(Math.round(rcFile.data.length * 0.75))}${rcFile.mime === 'image/jpeg' ? ' (compressed)' : ''}`;
+    } catch (err) { rcFile = null; $('#rc-file').textContent = 'No file chosen.'; $('#rc-msg').className = 'msg err'; $('#rc-msg').textContent = err.message; }
+  }
+  $('#rc-form').photo.addEventListener('change', (e) => { pickReceipt(e.target.files[0]); e.target.value = ''; });
+  $('#rc-form').file.addEventListener('change', (e) => { pickReceipt(e.target.files[0]); e.target.value = ''; });
+  $('#rc-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target, msg = $('#rc-msg'), btn = f.querySelector('button[type=submit]');
+    if (!rcFile) { msg.className = 'msg err'; msg.textContent = 'Take a photo or choose a file first.'; return; }
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Uploading…';
+    try { await rpc('rd_f_receipt_add', { p_token: TOKEN, p_receipt: { data: rcFile.data, file_name: rcFile.name, order_number: f.order_number.value, phone_id: f.phone_id.value || null, note: f.note.value } });
+      rcFile = null; f.reset(); $('#rc-file').textContent = 'No file chosen.'; msg.textContent = ''; toast('Receipt uploaded'); await loadFriend();
+    } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
+    btn.disabled = false;
+  });
+  function openDataUrl(d, name) {
+    const m = /^data:([^;]+);base64,(.*)$/.exec(d || ''); if (!m) { toast('File not found'); return; }
+    const bin = atob(m[2]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([u8], { type: m[1] })), w = window.open(url, '_blank', 'noopener');
+    if (!w) { const a = document.createElement('a'); a.href = url; a.download = name || 'receipt'; a.click(); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  $('#fr-receipts').addEventListener('click', async (e) => {
+    const v = e.target.closest('[data-rview]'), d = e.target.closest('[data-rdel]');
+    try {
+      if (v) openDataUrl(await rpc('rd_f_receipt_get', { p_token: TOKEN, p_id: +v.dataset.rview }));
+      if (d && confirm('Delete this receipt?')) { await rpc('rd_f_receipt_delete', { p_token: TOKEN, p_id: +d.dataset.rdel }); toast('Deleted'); await loadFriend(); }
+    } catch (err) { toast(err.message); }
+  });
+  // ---------- admin: Friends list (client-list pattern) + friend detail
+  async function loadFriendsView() {
+    if (!CFG || !KEY) return;
+    flAccounts = await rpc('rd_accounts', { p_key: KEY });
+    if (frDetail) { fdData = await rpc('rd_friend_detail', { p_key: KEY, p_member_id: frDetail }); }
+    renderFriends();
+  }
+  function renderFriends() {
+    $('#fl-list-view').hidden = !!frDetail; $('#fl-detail-view').hidden = !frDetail;
+    if (frDetail) return renderFriendDetail();
+    const admin = flAccounts.find((a) => a.role === 'admin'), friends = flAccounts.filter((a) => a.role !== 'admin');
+    $('#fl-admin').innerHTML = admin ? `<div class="split"><span><b>Admin login: @${esc(admin.username)}</b><br><small class="muted">${admin.has_password ? 'Password set' + (admin.last_login_at ? ' · last login ' + esc(et(admin.last_login_at)) : '') : 'No password yet. Your owner link works; set a password to log in on the main screen.'}</small></span><button class="btn" data-acct="${admin.id}" style="flex:none">${admin.has_password ? 'Change' : 'Set password'}</button></div>` : '';
+    const act = friends.filter((a) => !a.disabled), dis = friends.filter((a) => a.disabled);
+    $('#fl-n-active').textContent = act.length; $('#fl-n-disabled').textContent = dis.length;
+    const list = flFilter === 'active' ? act : dis;
+    $('#fl-list').innerHTML = list.map((a) => `<div class="client-row${a.disabled ? ' archived' : ''}">
+      <button class="card card-link" type="button" data-fopen="${a.member_id}"><div class="split"><div class="card-title">${esc(a.name)}</div>${a.disabled ? '<span class="chip off">Turned off</span>' : `<span class="chip ${+a.owed > 0 ? 'on' : ''}">${money(+a.owed)} owed</span>`}</div>
+        <div class="status-line">${a.phones} phone${a.phones == 1 ? '' : 's'} · ${money(+a.total_paid)} total${a.last_upload_at ? ' · last upload ' + esc(et(a.last_upload_at)) : ' · nothing uploaded yet'}</div>
+        <div class="muted">@${esc(a.username)}${a.last_login_at ? ' · last login ' + esc(et(a.last_login_at)) : ' · never logged in'}</div>
+        <div class="chips"><span class="chip">${a.receipts} receipt${a.receipts == 1 ? '' : 's'}</span><span class="chip ${a.logged > 0 ? 'on' : ''}">${a.logged} logged</span>${a.phones - a.logged > 0 ? `<span class="chip">${a.phones - a.logged} returned</span>` : ''}</div></button>
+      <div class="client-menu"><button type="button" class="client-menu-trigger" aria-label="More actions for ${esc(a.name)}" aria-haspopup="menu" aria-expanded="${flMenu === a.id}" data-fmenu="${a.id}">⋯</button>
+        ${flMenu === a.id ? `<div class="client-menu-pop" role="menu"><button role="menuitem" data-fopen="${a.member_id}">Open friend</button><button role="menuitem" data-acct="${a.id}">Edit / reset PIN</button><button role="menuitem" data-ftoggle="${a.id}">${a.disabled ? 'Turn login back on' : 'Turn off login'}</button></div>` : ''}</div></div>`).join('')
+      || `<p class="empty">${flFilter === 'active' ? 'No friend accounts yet. Tap + New friend.' : 'No turned-off logins.'}</p>`;
+  }
+  function renderFriendDetail() {
+    const d = fdData; if (!d || !d.member) { $('#fd-body').innerHTML = '<p class="empty">Friend not found.</p>'; return; }
+    const P = d.phones, logged = P.filter((p) => p.status === 'logged'), owed = r2(logged.reduce((a, p) => a + +p.price_paid, 0)), total = r2(P.reduce((a, p) => a + +p.price_paid, 0)), a = d.account;
+    const rcFor = (id) => d.receipts.filter((x) => x.phone_id === id);
+    const rcRow = (x) => `<div class="rc-row"><span class="grow"><b>${esc(x.file_name || (x.mime === 'application/pdf' ? 'Receipt (PDF)' : 'Receipt photo'))}</b><small>${esc(et(x.created_at))}${x.order_number ? ' · Order ' + esc(x.order_number) : ''}${x.note ? ' · ' + esc(x.note) : ''} · ${fmtBytes(x.size_bytes)}</small></span><button class="btn" data-arview="${x.id}">View</button><button class="btn ghost danger" data-ardel="${x.id}" aria-label="Delete receipt">✕</button></div>`;
+    const kv = (k, v) => v ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : '';
+    $('#fd-body').innerHTML = `<div class="cd-hero dash-hero" style="margin-top:10px"><div class="cd-hero-txt" style="padding:4px 4px"><p class="k">Friend${a && a.role === 'admin' ? ' · admin' : ''}</p><p class="h">${esc(d.member.name)}</p>
+        <p class="w">${a ? '@' + esc(a.username) + (a.disabled ? ' · login turned off' : '') + (a.last_login_at ? ' · last login ' + esc(et(a.last_login_at)) : ' · never logged in') : 'No login'}</p></div></div>
+      <div class="stats"><div class="wide"><small>Payout owed · ${logged.length} logged phone${logged.length === 1 ? '' : 's'}</small><b>${money(owed)}</b></div>
+        <div><small>Items brought</small><b>${P.length}</b></div><div><small>Total paid (all)</small><b>${money(total)}</b></div></div>
+      ${a && a.role !== 'admin' ? `<div class="actions"><button class="btn" data-acct="${a.id}">Edit / reset PIN</button><button class="btn" data-ftoggle="${a.id}">${a.disabled ? 'Turn login on' : 'Turn login off'}</button></div>` : ''}
+      <div class="kicker">Items (${P.length})</div>
+      ${P.map((p) => `<div class="card fd-item"><div class="row"><p class="t grow">${esc(phoneName(p))}</p><b>${money(+p.price_paid)}</b></div>
+        <p class="d">${esc(etLong(p.created_at))} · ${p.status === 'logged' ? 'Logged (payout owed)' : 'Returned'}</p>
+        <dl class="kv">${kv('Serial', p.serial)}${kv('IMEI', p.imei1)}${kv('IMEI 2', p.imei2)}${kv('Part no.', p.part_number)}${kv('Model', p.model)}${kv('Color', p.color)}${kv('Storage', p.storage)}${kv('SKU', p.sku)}${kv('Order no.', p.order_number)}${kv('Handwritten', p.handwritten_serial)}${kv('Name entered', p.entered_name)}${kv('Payout', money(+p.price_paid))}${kv('Notes', p.notes)}</dl>
+        ${hwMismatch(p) ? `<p class="flag">Handwritten serial “${esc(p.handwritten_serial)}” doesn’t match the scanned serial</p>` : ''}
+        ${rcFor(p.id).length ? `<div style="margin-top:8px">${rcFor(p.id).map(rcRow).join('')}</div>` : ''}
+        <div class="actions">${p.has_photo ? `<button class="btn" data-fphoto="${p.id}">Box photo</button>` : ''}<button class="btn" data-fedit="${p.id}">Edit</button></div><div data-photo-slot="${p.id}"></div></div>`).join('') || '<p class="empty">No items yet.</p>'}
+      <div class="kicker">Receipts (${d.receipts.length})</div>
+      ${d.receipts.length ? `<div class="card">${d.receipts.map(rcRow).join('')}</div>` : '<p class="empty">No receipts yet.</p>'}`;
+  }
+  $('#fl-filter').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; flFilter = b.dataset.v; document.querySelectorAll('#fl-filter button').forEach((x) => x.classList.toggle('on', x === b)); renderFriends(); });
+  $('#fd-back').addEventListener('click', () => { location.hash = 'friends'; });
+  $('#fl-new').addEventListener('click', () => openAcct(null));
+  $('#tab-friends').addEventListener('click', async (e) => {
+    const t = (sel) => e.target.closest(sel);
+    if (t('[data-fmenu]')) { const id = +t('[data-fmenu]').dataset.fmenu; flMenu = flMenu === id ? null : id; renderFriends(); return; }
+    if (t('[data-fopen]')) { flMenu = null; location.hash = 'friends/' + t('[data-fopen]').dataset.fopen; return; }
+    if (t('[data-acct]')) { flMenu = null; renderFriends(); openAcct(flAccounts.find((a) => a.id === +t('[data-acct]').dataset.acct)); return; }
+    try {
+      if (t('[data-ftoggle]')) { flMenu = null; const a = flAccounts.find((x) => x.id === +t('[data-ftoggle]').dataset.ftoggle); if (!a) return;
+        if (!a.disabled && !confirm(`Turn off ${a.name}'s login? They're signed out right away. Their phones stay.`)) { renderFriends(); return; }
+        await call('rd_account_save', { p_id: a.id, p_name: a.name, p_username: a.username, p_pass: null, p_disabled: !a.disabled }); toast(a.disabled ? 'Login turned on' : 'Login turned off'); await loadFriendsView(); return; }
+      if (t('[data-fedit]')) { const p = fdData.phones.find((x) => x.id === +t('[data-fedit]').dataset.fedit); if (p) { if (!ext.members.length) await loadExt().catch(() => {}); openPhone(p); } return; }
+      if (t('[data-fphoto]')) { const id = +t('[data-fphoto]').dataset.fphoto, d = await call('rd_phone_photo', { p_id: id }), slot = $(`[data-photo-slot="${id}"]`);
+        if (d && slot) slot.innerHTML = `<img class="fd-thumb" alt="Box photo" src="${esc(d)}">`; return; }
+      if (t('[data-arview]')) { openDataUrl(await call('rd_receipt_get', { p_id: +t('[data-arview]').dataset.arview })); return; }
+      if (t('[data-ardel]')) { if (!confirm('Delete this receipt for good?')) return; await call('rd_receipt_delete', { p_id: +t('[data-ardel]').dataset.ardel }); toast('Deleted'); await loadFriendsView(); return; }
+    } catch (err) { toast(err.message); }
+    if (flMenu !== null && !t('.client-menu')) { flMenu = null; renderFriends(); }
+  });
+  function openAcct(a) {
+    acctEdit = a || null; const f = $('#acct-form'); f.reset(); $('#sa-msg').textContent = '';
+    const isAdmin = a && a.role === 'admin';
+    $('#sa-title').textContent = !a ? 'New friend' : isAdmin ? 'Admin login' : `Edit ${a.name}`;
+    $('#sa-sub').textContent = !a ? 'They log in on the main screen with this username and PIN.' : isAdmin ? 'Your own login for the main screen. The owner link keeps working too.' : 'Leave PIN empty to keep the current one. A new PIN signs them out everywhere.';
+    f.name.value = a ? a.name : ''; f.username.value = a ? a.username : ''; f.disabled.checked = !!(a && a.disabled);
+    $('#sa-pass-label').firstChild.textContent = isAdmin ? 'New password' : a ? 'New PIN or password (optional)' : 'PIN or password';
+    f.pass.type = isAdmin ? 'password' : 'text'; f.pass.placeholder = isAdmin ? '8+ characters' : '4+ characters';
+    $('#sa-gen').hidden = !!isAdmin; $('#sa-dis-wrap').hidden = !a || isAdmin; $('#sa-delete').hidden = !a || isAdmin;
+    sheet('#sheet-acct'); setTimeout(() => (a ? f.pass : f.name).focus({ preventScroll: true }), 50);
+  }
+  $('#sa-gen').addEventListener('click', () => { const a = new Uint32Array(1); crypto.getRandomValues(a); $('#acct-form').pass.value = String(a[0] % 1000000).padStart(6, '0'); });
+  $('#acct-form').name.addEventListener('input', (e) => { const f = $('#acct-form'); if (!acctEdit && !f.username.dataset.touched) f.username.value = e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 32); });
+  $('#acct-form').username.addEventListener('input', (e) => { e.target.dataset.touched = '1'; });
+  $('#acct-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target, msg = $('#sa-msg'); msg.className = 'msg err';
+    const pass = f.pass.value, isAdmin = acctEdit && acctEdit.role === 'admin';
+    if (!f.name.value.trim()) { msg.textContent = 'Enter a name.'; return; }
+    if (!/^[a-z0-9._-]{2,32}$/.test(f.username.value.trim().toLowerCase())) { msg.textContent = 'Username: 2–32 letters, numbers, dot, dash or underscore.'; return; }
+    if (!acctEdit && pass.length < 4) { msg.textContent = 'Set a PIN or password (4+ characters).'; return; }
+    if (pass && pass.length < (isAdmin ? 8 : 4)) { msg.textContent = isAdmin ? 'Admin password: 8+ characters.' : 'PIN: 4+ characters.'; return; }
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
+    try {
+      const r = await call('rd_account_save', { p_id: acctEdit ? acctEdit.id : null, p_name: f.name.value.trim(), p_username: f.username.value.trim().toLowerCase(), p_pass: pass || null, p_disabled: f.disabled.checked });
+      closeSheet();
+      toast(!acctEdit ? `Created @${r.username}. Send them the app link + their PIN.` : pass ? 'Saved. New PIN is active.' : 'Saved');
+      await loadFriendsView(); refreshExt();
+    } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
+    btn.disabled = false;
+  });
+  $('#sa-delete').addEventListener('click', async () => {
+    const a = acctEdit; if (!a) return;
+    if (!confirm(`Delete ${a.name}'s login? Their phones and receipts stay under their name (you can delete those separately).`)) return;
+    const wipe = confirm(`Also delete ALL of ${a.name}'s phones and receipts? This can't be undone.\n\nOK = delete everything · Cancel = keep their data`);
+    try { await call('rd_account_delete', { p_id: a.id, p_delete_data: wipe }); closeSheet(); toast('Login deleted'); if (frDetail === a.member_id && wipe) location.hash = 'friends'; await loadFriendsView(); refreshExt(); loadPhones().catch(() => {}); }
+    catch (err) { $('#sa-msg').className = 'msg err'; $('#sa-msg').textContent = err.message; }
+  });
+  // Settings → Account
+  if ($('#acct-who')) $('#acct-who').textContent = MODE !== 'admin' ? '' : !CFG ? 'Local box server.' : (SESSION && SESSION.role === 'admin') ? `Signed in as @${SESSION.username} (admin).` : 'Signed in with the owner link (admin).';
+  $('#acct-logout').addEventListener('click', () => { if (confirm(SESSION && SESSION.role === 'admin' ? 'Log out on this device?' : 'Log out? This device forgets the owner link; open it again or log in as krishna.')) signOut('Logged out.'); });
+
   // ---------- data
   async function load() {
     try {
@@ -901,9 +1248,12 @@
     $('#boot').classList.add('gone');
   }
   const route = () => { const [h, hs] = location.hash.slice(1).split('/');
+    if (h === 'friends') { frDetail = hs && /^\d+$/.test(hs) ? +hs : null; show('friends', hs || null); return; }
     if (['home', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
-  route(); window.addEventListener('hashchange', route);
-  load();
-  setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+  if (MODE === 'admin') {
+    route(); window.addEventListener('hashchange', route);
+    load();
+    setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+  } else bootOther();
 })();

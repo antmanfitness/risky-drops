@@ -1,21 +1,24 @@
-/* Risky Drops tokens. Values copied from antman-coaching/src/index.css (dark) and themes/light.css (light). */
+/* Risky Drops tokens. Neutrals copied from antman-coaching/src/index.css (dark) and themes/light.css (light).
+   Oct 18 2026: accent switched from blue to green (Krishna). White on --accent-btn = 5.0:1; --accent on --card (dark) ≈ 8:1; light --accent-2 on --card ≈ 7:1. */
 :root, [data-theme="dark"] {
-  --accent: #2f80ff; --accent-rgb: 47, 128, 255; --accent-2: #5c9cff; --accent-dim: rgba(47, 128, 255, 0.2); --accent-btn: #1f6fe8;
+  --accent: #2fbf71; --accent-rgb: 47, 191, 113; --accent-2: #5fd895; --accent-dim: rgba(47, 191, 113, 0.2); --accent-btn: #15803d;
+  --live: #4dff9a; --live-rgb: 77, 255, 154;
   --bg: #030404; --bg-2: #090b0d; --card: #17191e; --card-2: #20242b;
   --line: rgba(var(--accent-rgb), 0.34); --line-2: rgba(var(--accent-rgb), 0.58);
   --text: #f4f1ea; --muted: #8d929b; --faint: #5c616a;
   --red: #ff4338; --red-2: #ff786e; --red-dim: rgba(255, 67, 56, 0.25);
-  --amber: #e0b05a; --sky: #8ab4ff; --green: #34c759;
+  --amber: #e0b05a; --sky: #8fd9b0; --green: #34c759;
   --glass: rgba(23, 25, 30, 0.62); --hair: rgba(255, 255, 255, 0.10);
   color-scheme: dark;
 }
 [data-theme="light"] {
   --bg: #f6f1e8; --bg-2: #fffaf2; --card: #fffdf8; --card-2: #eee7dc;
-  --line: rgba(31, 92, 200, 0.22); --line-2: rgba(31, 92, 200, 0.42);
+  --line: rgba(21, 128, 61, 0.24); --line-2: rgba(21, 128, 61, 0.44);
   --text: #1f2022; --muted: #62666d; --faint: #8c8a86;
   --red: #c93027; --red-2: #9f241e; --red-dim: rgba(201, 48, 39, 0.12);
-  --accent-2: #1f6fe8; --accent-dim: rgba(47, 128, 255, 0.12);
-  --amber: #986b16; --sky: #3e6eb8; --green: #1f8a3c;
+  --accent: #15803d; --accent-rgb: 21, 128, 61; --accent-2: #166534; --accent-dim: rgba(21, 128, 61, 0.12); --accent-btn: #15803d;
+  --live: #16a34a; --live-rgb: 22, 163, 74;
+  --amber: #986b16; --sky: #2f7d57; --green: #1f8a3c;
   --glass: rgba(255, 253, 248, 0.72); --hair: rgba(60, 60, 67, 0.14);
   color-scheme: light;
 }
