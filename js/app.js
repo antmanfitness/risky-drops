@@ -1859,7 +1859,7 @@
     const note = (!r.pickup_error && all.length && !shown.length) ? '<p class="d" style="margin:8px 2px">Only NY stores came back. Turn on “Include NY stores” to see them.</p>' : '';
     const quote = !r.pickup_error && !avail && shown.some((s) => s.quote) ? `<p class="hint" style="margin:6px 2px 0">Apple says: “${esc((shown.find((s) => s.quote) || {}).quote)}”</p>` : '';
     out.innerHTML = `${head}${sum}<div class="dz-wrap card" tabindex="0" role="region" aria-label="iPhone Duo stock table, scroll sideways"><table class="dz-tbl">${duoHead(r.parts)}<tbody>${rows}</tbody></table></div>${note}${quote}
-      <p class="hint" style="margin:8px 2px 0">256GB and 512GB are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys. Swipe the table sideways for all 8 models.</p>`;
+      <p class="hint" style="margin:8px 2px 0">256GB and 512GB are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys. If the table doesn’t fit your screen, swipe it sideways.</p>`;
   }
   async function duoRun(force) {
     const zip = ($('#duo-zip').value || '').trim(), msg = $('#duo-msg');

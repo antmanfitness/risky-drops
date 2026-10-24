@@ -1,0 +1,155 @@
+/* Risky Drops: front (cover) screen polish + inner (7.6" open) screen layout for the iPhone Duo. Added Oct 24 2026.
+   Approach copied from antman-coaching src/styles/v151-fold.css: pure CSS, design by rule (no invented device sizes).
+   "Open" = a touch screen whose SHORTER side is >= 560 CSS px, either orientation. The closed Duo (~375 wide) and normal iPhones never match.
+   Everything below the open block is the phone / front-screen layout. Safe areas use env(safe-area-inset-*) (can't be tested without hardware). */
+
+/* ---------- Front screen / phone polish ---------- */
+/* Header: logo | title + status line | gear. The title never wraps (a long "Box offline? Last sync …" line used to squeeze it to one letter per row). */
+.app-header { display: grid; grid-template-columns: 32px minmax(0, 1fr) 44px; grid-template-areas: "logo h gear" "logo u gear"; column-gap: 10px; align-items: center;
+  padding-top: calc(8px + env(safe-area-inset-top)); padding-bottom: 8px; }
+.app-header .logo { grid-area: logo; }
+.app-header h1 { grid-area: h; flex: none; white-space: nowrap; line-height: 1.15; font-size: 20px; }
+.app-header small { grid-area: u; text-align: left; font-size: 11.5px; line-height: 1.25; min-width: 0; }
+.app-header small:empty { display: none; }
+.app-header .icon-btn { grid-area: gear; grid-row: 1 / span 2; }
+h2.section { font-size: 26px; margin-top: 6px; }
+
+/* Ask orb: a touch smaller, and lined up with the right edge of the tab bar (it floats just above it). */
+.ask-orb { width: 52px; height: 52px; right: max(18px, calc(50vw - 214px), calc(env(safe-area-inset-right) + 14px)); bottom: calc(84px + env(safe-area-inset-bottom)); }
+.ask-orb svg { width: 22px; height: 22px; margin-top: -5px; }
+.ask-orb-label { bottom: 6px; font-size: 10px; }
+.tabbar button { font-size: 10.5px; }
+@media (max-width: 360px) { .tabbar button { font-size: 10px; } }
+
+/* Money / big numbers never break mid-number. */
+.stats .wide { flex-wrap: wrap; row-gap: 2px; }
+.stats .wide small { flex: 1 1 130px; min-width: 0; }
+.stats .wide b, .dstat b, .sd-card b, .mgrid b, .fc-hero b { white-space: nowrap; overflow-wrap: normal; }
+.sd-card b { overflow-wrap: normal; }
+
+/* Item-type picker: tiles line up even when a hint wraps to a different number of lines. */
+.tpick { align-content: center; grid-auto-rows: max-content; }
+
+/* Watch list rows: name gets the full width (it was cut to "Mock Sneaker D…"), status + times wrap underneath. */
+.wd-row { display: grid; grid-template-columns: minmax(0, 1fr) 16px; align-items: center; column-gap: 8px; row-gap: 4px; }
+.wd-main b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wd-chev { grid-column: 2; grid-row: 1; }
+.wd-side { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-items: unset; gap: 2px 10px; max-width: none; }
+.wd-side small { white-space: normal; overflow: visible; }
+@media (min-width: 480px) {
+  .wd-row { grid-template-columns: minmax(0, 1fr) auto 16px; }
+  .wd-side { grid-column: 2; grid-row: 1; display: grid; justify-items: end; gap: 2px; max-width: 280px; }
+  .wd-side small { white-space: nowrap; overflow: hidden; }
+  .wd-chev { grid-column: 3; }
+}
+
+/* Touch targets >= 44px (visual size stays compact where it's a pill; the hit area grows). */
+.seg button { min-height: 44px; }
+.sd-range button { min-height: 44px; }
+.wd-sort button { min-height: 44px; }
+.client-menu-trigger { width: 44px; height: 44px; }
+.client-menu { top: 8px; right: 6px; }
+.client-menu-pop button { min-height: 44px; }
+.linkbtn { min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; margin: 0 -8px; }
+.spills { padding: 8px 2px; margin: -4px -2px 0; }
+.spill { position: relative; }
+.spill::after, .sd-metric button::after { content: ''; position: absolute; left: -2px; right: -2px; top: -8px; bottom: -8px; }
+.sd-metric { padding: 9px 0; margin: -9px 0; }
+.sd-metric button { position: relative; }
+.sd-metric button::after { top: -9px; bottom: -9px; }
+.icon-btn, .star-btn { min-width: 44px; min-height: 44px; }
+
+/* Segmented tab strip that can scroll sideways: fade the edge so a cut-off pill reads as "more", not as a mistake. */
+@media (max-width: 480px) { #w-seg { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); } }
+
+/* Duo Stock table on the front screen: a little tighter so more of it shows. */
+@media (max-width: 559px) { .dz-tbl th.store { min-width: 108px; max-width: 116px; } .dz-tbl td { min-width: 74px; } }
+
+/* Front screen turned sideways (short, touch): slim header that scrolls away, slim one-row tab bar, orb beside it. */
+@media (pointer: coarse) and (max-height: 500px) {
+  .app-header { position: static; padding-top: calc(6px + env(safe-area-inset-top)); padding-bottom: 4px; }
+  .app-header::after { display: none; }
+  h2.section { font-size: 22px; margin: 2px 4px 6px; }
+  main { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .tabbar { width: min(520px, calc(100vw - 2 * max(84px, env(safe-area-inset-left) + 80px))); bottom: calc(8px + env(safe-area-inset-bottom)); padding: 4px; border-radius: 22px; }
+  .tabbar button { grid-auto-flow: column; justify-content: center; align-items: center; min-height: 44px; gap: 6px; font-size: 12px; padding: 0 4px; }
+  .tabbar button svg { width: 20px; height: 20px; }
+  .tabbar .badge { top: 2px; right: 6px; }
+  .ask-orb { width: 48px; height: 48px; bottom: calc(10px + env(safe-area-inset-bottom)); right: max(16px, calc(env(safe-area-inset-right) + 12px)); }
+  .ask-orb svg { margin-top: -4px; }
+  .toast { bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .sheet { max-height: 96dvh; }
+  .cd-hero { padding: 12px 14px; }
+  .cd-orbit { width: 84px; height: 84px; }
+}
+
+/* ---------- Inner (open, 7.6") screen ---------- */
+@media (pointer: coarse) and (min-width: 560px) and (min-height: 560px) {
+  :root { --fold-pad-l: max(24px, calc(env(safe-area-inset-left) + 16px)); --fold-pad-r: max(24px, calc(env(safe-area-inset-right) + 16px)); }
+  main { max-width: none; margin: 0; padding-left: var(--fold-pad-l); padding-right: var(--fold-pad-r); padding-bottom: calc(132px + env(safe-area-inset-bottom)); }
+  .app-header { padding-left: var(--fold-pad-l); padding-right: var(--fold-pad-r); grid-template-columns: 36px minmax(0, 1fr) 44px; }
+  .app-header .logo { width: 36px; height: 36px; }
+  .app-header h1 { font-size: 22px; }
+  h2.section { font-size: 30px; }
+
+  /* Tab bar spans the width inside the safe areas; the Ask orb sits on the same row at its right end. */
+  .tabbar { transform: none; width: auto; max-width: none; left: max(16px, calc(env(safe-area-inset-left) + 12px));
+    right: calc(max(16px, calc(env(safe-area-inset-right) + 12px)) + 52px + 12px); }
+  .tabbar button { grid-auto-flow: column; justify-content: center; gap: 8px; font-size: 14px; font-weight: 700; min-height: 52px; }
+  .tabbar button svg { width: 24px; height: 24px; }
+  .tabbar .badge { position: static; margin-left: 2px; }
+  .ask-orb { right: max(16px, calc(env(safe-area-inset-right) + 12px)); bottom: calc(16px + env(safe-area-inset-bottom)); width: 52px; height: 52px; }
+  .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+  /* Cards flow into columns: 2 on the portrait inner screen, 3 in landscape, 1 when narrower. */
+  .fold-grid, #watch-list, #dash-cards, #listing-list, #sold-list, #phone-list, #alert-list, #flip-list, #fav-list, #cd-trending, #cd-list, #fl-list, #ask-history, #fr-phones, #fr-receipts, #parts-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px 16px; align-items: start; }
+  :is(.fold-grid, #watch-list, #dash-cards, #listing-list, #sold-list, #phone-list, #alert-list, #flip-list, #fav-list, #cd-trending, #cd-list, #fl-list, #ask-history, #fr-phones, #fr-receipts) > * { min-width: 0; margin: 0; }
+  :is(#alert-list, #flip-list, #phone-list, #sold-list, #listing-list, #fav-list, #cd-list, #cd-trending, #fl-list, #ask-history) > :is(.day, .kicker, .empty, p.hint, p.empty, .row) { grid-column: 1 / -1; }
+  #parts-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .client-row { margin: 0; }
+
+  /* Home: four stat tiles in one row, then the cards in columns. */
+  .dash-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .dstat { min-height: 92px; }
+  .cd-hero { padding: 22px 26px; }
+
+  /* Watches: Duo shortcut, dashboard and summary sit side by side; the watcher cards below use the full width. */
+  #w-main { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px 16px; align-items: start; }
+  #w-main > * { min-width: 0; margin: 0; }
+  #w-main > #watch-list, #w-main > .kicker, #w-main > #add-form { grid-column: 1 / -1; }
+  #w-main > #add-form { max-width: 720px; }
+  #w-main > #duo-card { order: 1; } #w-main > #summary { order: 2; } #w-main > #w-dash { order: 3; grid-column: 1 / -1; }
+  #w-main > #watch-list { order: 4; } #w-main > .kicker { order: 5; } #w-main > #add-form { order: 6; }
+  #w-seg { max-width: 640px; -webkit-mask-image: none; mask-image: none; }
+  #wd-back, #wdetail-body { max-width: 860px; }
+
+  /* Duo Stock: the table gets the whole width, so all 8 models show without scrolling when they fit. */
+  .duo-form { max-width: 640px; }
+  .dz-wrap { width: 100%; }
+  .dz-tbl { width: 100%; min-width: 100%; table-layout: auto; font-size: 13px; }
+  .dz-tbl td { min-width: 0; padding: 5px 2px; }
+  .dz-tbl th.store { min-width: 116px; max-width: 200px; padding: 7px 8px; }
+  .dz { font-size: 10.5px; min-height: 48px; padding: 4px 1px; }
+  td.emph .dz { font-size: 10.5px; }
+  .dz small { font-size: 10px; }
+  .dz-tbl thead th { font-size: 11px; padding: 6px 2px; }
+  .dz-tbl thead th.emph { font-size: 14px; }
+  .dz-tbl thead th.sub { font-size: 10px; padding: 6px 0; letter-spacing: -.01em; }
+  .dz-tbl .sw { width: 7px; height: 7px; margin-right: 3px; }
+  .dz-tbl th.store { min-width: 108px; }
+  @media (min-width: 900px) { .dz, td.emph .dz { font-size: 12px; } .dz-tbl td { padding: 5px 4px; } .dz-tbl th.store { min-width: 128px; } .dz-tbl thead th.sub { font-size: 11px; padding: 6px 2px; } .dz-tbl .sw { width: 8px; height: 8px; margin-right: 4px; } }
+
+  /* Settings and forms: cards in columns instead of one stretched column of inputs. */
+  #tab-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 0 16px; align-items: start; }
+  #tab-settings > * { min-width: 0; }
+  #tab-settings > h2.section { grid-column: 1 / -1; }
+  #tab-phones > .tpick-grid, #tab-friend .tpick-grid { max-width: 720px; }
+  #tab-phones > .hint { max-width: 720px; }
+  #ph-search { max-width: 520px; }
+  #tab-ask .ask-card, #tab-ask #ask-answer { max-width: 860px; }
+  #tab-login, #tab-friend { max-width: 760px; margin-left: auto; margin-right: auto; }
+  #tab-login .login-card { max-width: 480px; margin-left: auto; margin-right: auto; }
+  .sheet { width: min(640px, calc(100vw - 2 * var(--fold-pad-l))); }
+  #tab-sales > .sd { }
+}
