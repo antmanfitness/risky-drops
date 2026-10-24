@@ -109,7 +109,7 @@
 
   // ---------- tabs
   // Tabs: Home / Watches (list | alerts | countdowns) / Phones / Sales (listings | sold | comps). Settings = header gear, Ask = floating orb.
-  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
+  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], duo: ['watches', 'duo'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
   function show(tab, sub) {
     if (LEGACY[tab]) [tab, sub] = LEGACY[tab];
     state.tab = tab;
@@ -129,13 +129,14 @@
   }
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
   $('#gear').addEventListener('click', () => show('settings'));
-  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
+  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns', 'duo'], s: ['listings', 'sold', 'comps'] };
   function showSub(g, v) {
     if (!SUBS[g].includes(v)) return; state[g + 'sub'] = v;
     document.querySelectorAll(`#${g}-seg button`).forEach((b) => b.classList.toggle('on', b.dataset.v === v));
     SUBS[g].forEach((x) => ($(`#${g}-${x}`).hidden = x !== v));
     if (g === 'w' && v === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
     if (g === 'w' && v === 'favs' && typeof loadFavs === 'function') loadFavs();
+    if (g === 'w' && v === 'duo' && typeof duoOpen === 'function') duoOpen();
     if (g === 'w' && v !== 'list' && state.wdetail) { state.wdetail = null; if (typeof renderWatches === 'function') renderWatches(); }
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (g === 'w' ? 'watches' : 'sales') + '/' + v);
   }
@@ -1796,6 +1797,103 @@
     }
     $('#boot').classList.add('gone');
   }
+  // ---------- Duo Stock (Watches → Duo): live iPhone Duo pickup stock near a ZIP. Read-only; it only checks and links to Apple.
+  // The page can't call Apple (CORS), so it queues the `duo_stock` command (rd_command); sync.py on the box asks Apple, caches ~30s per ZIP,
+  // and acks the result, which this view polls (rd_command_status) and renders. Apple failures show as "couldn't check", never as stock.
+  const duo = { zip: localStorage.getItem('rd-duo-zip') || '', ny: localStorage.getItem('rd-duo-ny') === '1', res: null, busy: false, req: 0, opened: false };
+  try { const l = JSON.parse(localStorage.getItem('rd-duo-last') || 'null'); if (l && l.zip) { duo.res = l; duo.saved = true; if (!duo.zip) duo.zip = l.zip; } } catch (e) { /* ignore */ }
+  const DUO_COLS = [['256GB', 'emph'], ['512GB', 'emph'], ['1TB', 'dim'], ['2TB', 'dim']];
+  const etTime = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+  const apple = (u) => /^https:\/\/www\.apple\.com\//.test(u || '') ? u : '';
+  const duoShip = (d) => { if (!/^\d{8}$/.test(d || '')) return ''; const dt = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)));
+    const o = { timeZone: 'UTC', month: 'short', day: 'numeric' }; if (dt.getUTCFullYear() !== new Date().getFullYear()) o.year = '2-digit'; return new Intl.DateTimeFormat('en-US', o).format(dt).replace(/, (\d\d)$/, ' ’$1'); };
+  const duoChecked = (r) => r.checked_ts ? etTime.format(new Date(r.checked_ts * 1000)) + ' ET' : '';
+  function duoHead(parts) {
+    const g = DUO_COLS.map(([s, c]) => `<th colspan="2" class="${c}">${s}</th>`).join('');
+    const sub = parts.map((p) => `<th class="${/256|512/.test(p.storage) ? 'emph' : 'dim'} sub"><i class="sw ${p.color === 'Star White' ? 'w' : 'n'}"></i>${p.color === 'Star White' ? 'Star White' : 'Night Sky'}</th>`).join('');
+    return `<thead><tr><th class="store" rowspan="2">Store</th>${g}</tr><tr>${sub}</tr></thead>`;
+  }
+  function duoCell(p, v, store) {
+    const emph = /256|512/.test(p.storage) ? 'emph' : 'dim', link = apple(p.link);
+    const txt = v === 'available' ? 'Available' : v === 'unavailable' ? 'Unavailable' : 'No data';
+    const cls = v === 'available' ? 'av' : v === 'unavailable' ? 'un' : 'nd';
+    const tip = `${store} · iPhone Duo ${p.storage} ${p.color}: ${txt}`;
+    return `<td class="${emph}">${link ? `<a class="dz ${cls}" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${txt}</a>` : `<span class="dz ${cls}">${txt}</span>`}</td>`;
+  }
+  function duoOnlineRow(r) {
+    const o = r.online, zip = esc(r.zip);
+    const lead = `<th class="store"><span class="sn">Online</span><span class="sl">Ships to ${zip}</span></th>`;
+    if (!o) return `<tr class="online err">${lead}<td colspan="8"><span class="dz-err">Couldn't check online${r.online_error ? ': ' + esc(r.online_error.message) : ''}</span></td></tr>`;
+    return `<tr class="online">${lead}${r.parts.map((p) => {
+      const x = (o.items || {})[p.part] || {}, emph = /256|512/.test(p.storage) ? 'emph' : 'dim', link = apple(p.link);
+      const d = duoShip(x.date), txt = x.buyable === true ? 'Buyable' : x.buyable === false ? 'Not buyable' : 'No data';
+      const cls = x.buyable === true ? 'av' : x.buyable === false ? 'un' : 'nd';
+      const tip = `Online · iPhone Duo ${p.storage} ${p.color}: ${txt}${d ? ', ships ' + d : ''}`;
+      const inner = `${txt}${d ? `<small>${esc(d)}</small>` : ''}`;
+      return `<td class="${emph}">${link ? `<a class="dz ${cls} two" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${inner}</a>` : `<span class="dz ${cls} two">${inner}</span>`}</td>`;
+    }).join('')}</tr>`;
+  }
+  function duoStoreRow(s, r) {
+    const link = apple(s.link), meta = `${esc(s.city)}, ${esc(s.state)} ${esc(s.zip)}`;
+    const any = r.parts.some((p) => s.avail[p.part] === 'available');
+    const name = `<span class="sn">${esc(s.name)}</span><span class="sl">${meta}${s.dist != null ? ` · ${s.dist.toFixed(1)} mi` : ''}</span>${s.ny ? '<span class="ny">NY (skipped for tax)</span>' : ''}`;
+    const lead = `<th class="store">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Apple ${esc(s.name)} store page">${name}</a>` : name}</th>`;
+    return `<tr class="${any ? 'hit' : ''}${s.ny ? ' nyrow' : ''}">${lead}${r.parts.map((p) => duoCell(p, s.avail[p.part], 'Apple ' + s.name)).join('')}</tr>`;
+  }
+  function duoRender() {
+    const out = $('#duo-out'), r = duo.res; if (!out) return;
+    if (!r) { out.innerHTML = '<div class="card"><p class="d">Enter a ZIP code and tap Check stock. Nothing is checked until you do.</p></div>'; return; }
+    const age = r.checked_ts ? `<span class="dz-when">${duo.saved ? 'Last checked' : 'Checked'} at ${esc(duoChecked(r))}${r.cached && !duo.saved ? ' (cached)' : ''}</span>` : '';
+    const head = `<div class="dz-bar"><div class="grow"><b>${esc(r.zip)}</b> ${age}</div><button type="button" class="btn ghost" id="duo-refresh" ${duo.busy ? 'disabled' : ''}>${duo.busy ? 'Checking…' : 'Refresh'}</button></div>`;
+    if (r.ok === false && r.error) {
+      const bad = r.error.kind === 'bad_zip';
+      out.innerHTML = `${head}<div class="card dz-fail"><p class="t">${bad ? 'Check that ZIP' : 'Couldn’t check'}</p><p class="d">${esc(r.error.message)}.${bad ? '' : ' No stock is shown because it can’t be verified right now. Try again in a few minutes.'}</p></div>`;
+      return;
+    }
+    const all = r.stores || [], shown = all.filter((s) => duo.ny || !s.ny), hidden = all.length - shown.length;
+    const avail = shown.filter((s) => r.parts.some((p) => s.avail[p.part] === 'available')).length;
+    let sum;
+    if (r.pickup_error) sum = `<div class="card dz-fail"><p class="t">Couldn’t check pickup stock</p><p class="d">${esc(r.pickup_error.message)}. Store stock isn’t shown because it can’t be verified right now.</p></div>`;
+    else sum = `<p class="dz-sum ${avail ? 'hot' : ''}">${shown.length} store${shown.length === 1 ? '' : 's'} near ${esc(r.zip)} · ${avail ? `<b>${avail} with Duo pickup</b>` : 'none with Duo pickup right now'}${hidden ? ` · ${hidden} NY hidden (skipped for tax)` : ''}</p>`;
+    const rows = duoOnlineRow(r) + (r.pickup_error ? '' : shown.map((s) => duoStoreRow(s, r)).join(''));
+    const note = (!r.pickup_error && all.length && !shown.length) ? '<p class="d" style="margin:8px 2px">Only NY stores came back. Turn on “Include NY stores” to see them.</p>' : '';
+    const quote = !r.pickup_error && !avail && shown.some((s) => s.quote) ? `<p class="hint" style="margin:6px 2px 0">Apple says: “${esc((shown.find((s) => s.quote) || {}).quote)}”</p>` : '';
+    out.innerHTML = `${head}${sum}<div class="dz-wrap card" tabindex="0" role="region" aria-label="iPhone Duo stock table, scroll sideways"><table class="dz-tbl">${duoHead(r.parts)}<tbody>${rows}</tbody></table></div>${note}${quote}
+      <p class="hint" style="margin:8px 2px 0">256GB and 512GB are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys. Swipe the table sideways for all 8 models.</p>`;
+  }
+  async function duoRun(force) {
+    const zip = ($('#duo-zip').value || '').trim(), msg = $('#duo-msg');
+    if (!/^\d{5}$/.test(zip)) { msg.className = 'msg err'; msg.textContent = 'Enter a 5-digit ZIP code.'; return; }
+    if (!CFG || !KEY) { msg.className = 'msg err'; msg.textContent = 'Open the app with your access link first.'; return; }
+    const my = ++duo.req; duo.zip = zip; localStorage.setItem('rd-duo-zip', zip);
+    duo.busy = true; $('#duo-go').disabled = true; msg.className = 'msg'; msg.textContent = 'Asking Apple through the box…'; duoRender();
+    try {
+      const c = await rpc('rd_command', { p_key: KEY, p_action: 'duo_stock', p_payload: { zip, force: !!force } });
+      const t0 = Date.now();
+      for (;;) {
+        await new Promise((res) => setTimeout(res, Date.now() - t0 < 6000 ? 1500 : 2500));
+        if (my !== duo.req) return;   // a newer lookup took over
+        const st = await rpc('rd_command_status', { p_key: KEY, p_id: c.id });
+        if (st && st.state === 'done') { const r = st.result || {}; if (r.zip === zip || r.ok === false) { duo.res = { ...r, zip: r.zip || zip }; duo.saved = false; if (r.ok) { try { localStorage.setItem('rd-duo-last', JSON.stringify(duo.res)); } catch (e) { /* quota */ } } } msg.textContent = ''; break; }
+        if (st && st.state === 'failed') { const e = (st.result && st.result.error) || 'The box could not run that'; duo.res = { ok: false, zip, error: { kind: /ZIP/.test(e) ? 'bad_zip' : 'box', message: e } }; duo.saved = false; msg.textContent = ''; break; }
+        const waited = Date.now() - t0;
+        if (waited > 60000) throw new Error('The box hasn’t picked this up. Is it online? Showing the last saved result, if any.');
+        if (waited > 15000) msg.textContent = 'Still waiting for the box…';
+      }
+    } catch (err) { if (my === duo.req) { msg.className = 'msg err'; msg.textContent = err.message === 'Failed to fetch' ? 'No connection. Showing the last saved result, if any.' : err.message; } }
+    if (my === duo.req) { duo.busy = false; $('#duo-go').disabled = false; duoRender(); }
+  }
+  function duoOpen() {
+    if (!duo.opened) { duo.opened = true; $('#duo-zip').value = duo.zip; $('#duo-ny').checked = duo.ny; }
+    duoRender();
+  }
+  if (CFG) {
+    $('#duo-form').addEventListener('submit', (e) => { e.preventDefault(); duoRun(false); });
+    $('#duo-out').addEventListener('click', (e) => { if (e.target.closest('#duo-refresh') && !duo.busy) { $('#duo-zip').value = duo.res && duo.res.zip || $('#duo-zip').value; duoRun(true); } });
+    $('#duo-ny').addEventListener('change', (e) => { duo.ny = e.target.checked; localStorage.setItem('rd-duo-ny', duo.ny ? '1' : '0'); duoRender(); });
+    $('#duo-card').addEventListener('click', () => showSub('w', 'duo'));
+  } else { $('#duo-card').hidden = true; const b = document.querySelector('#w-seg [data-v="duo"]'); if (b) b.hidden = true; }
+
   const route = () => { const [h, hs, h3] = location.hash.slice(1).split('/');
     if (h === 'watches' && hs === 'w' && h3) { state.wdetail = decodeURIComponent(h3); show('watches', 'list'); history.replaceState(null, '', location.pathname + location.search + '#watches/w/' + h3); renderWatches(); return; }
     if (state.wdetail) { state.wdetail = null; if (state.status) renderWatches(); }

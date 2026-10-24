@@ -16,15 +16,15 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var t=localStorage.getItem('rd-theme')||'dark';var d=t==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=d;})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261018162346">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261018162346">
-<link rel="stylesheet" href="./css/app.css?v=20261018162346">
+<link rel="stylesheet" href="./css/tokens.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024081653">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024081653">
+<link rel="stylesheet" href="./css/app.css?v=20261024081653">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -116,13 +116,18 @@
   </section>
   <section class="screen" id="tab-watches" hidden>
     <h2 class="section">Watches</h2>
-    <div class="seg" id="w-seg" style="margin-bottom:12px"><button data-v="list" class="on">Watch list</button><button data-v="favs" id="w-seg-favs">Favorites <span class="seg-badge fav" id="fav-count"></span></button><button data-v="alerts">Alerts <span class="seg-badge" id="badge"></span></button><button data-v="countdowns">Countdowns</button></div>
+    <div class="seg" id="w-seg" style="margin-bottom:12px"><button data-v="list" class="on">Watch list</button><button data-v="favs" id="w-seg-favs">Favorites <span class="seg-badge fav" id="fav-count"></span></button><button data-v="alerts">Alerts <span class="seg-badge" id="badge"></span></button><button data-v="countdowns">Countdowns</button><button data-v="duo">Duo</button></div>
     <div id="w-list">
     <div id="w-detail" hidden>
       <button type="button" class="back-link" id="wd-back">‹ All watches</button>
       <div id="wdetail-body"></div>
     </div>
     <div id="w-main">
+    <button type="button" class="card duo-card" id="duo-card" aria-label="Open Duo Stock">
+      <span class="duo-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg></span>
+      <span class="grow"><b class="t">Duo Stock</b><span class="d">Type a ZIP, see live iPhone Duo pickup stock at nearby Apple Stores.</span></span>
+      <span class="duo-go" aria-hidden="true">›</span>
+    </button>
     <div id="w-dash"></div>
     <div class="card summary" id="summary"></div>
     <div id="watch-list"></div>
@@ -176,6 +181,19 @@
       <div class="actions" style="margin:0 0 12px"><button class="btn buy" id="cd-new" type="button">+ New countdown</button></div>
       <div id="cd-list"></div>
     </div>
+    </div>
+    <div id="w-duo" hidden>
+      <div class="card duo-form">
+        <p class="t">Duo Stock</p>
+        <p class="d">Live iPhone Duo pickup stock near a ZIP, plus online shipping. Read-only.</p>
+        <form id="duo-form" autocomplete="off" class="duo-row">
+          <label class="field grow" for="duo-zip">ZIP code<input id="duo-zip" name="zip" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="08872" autocomplete="postal-code" enterkeyhint="search"></label>
+          <button class="btn buy" type="submit" id="duo-go">Check stock</button>
+        </form>
+        <label class="check" style="margin-top:2px;min-height:40px"><input type="checkbox" id="duo-ny"> Include NY stores <small class="f">(skipped for tax)</small></label>
+        <p class="msg" id="duo-msg" role="status" style="margin-top:2px"></p>
+      </div>
+      <div id="duo-out"></div>
     </div>
   </section>
   <section class="screen" id="tab-phones" hidden>
@@ -562,10 +580,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261018162346"></script>
-<script src="./js/orbit.js?v=20261018162346"></script>
-<script src="./js/classify.js?v=20261018162346"></script>
-<script src="./js/scanner.js?v=20261018162346"></script>
-<script src="./js/app.js?v=20261018162346"></script>
+<script src="./js/config.js?v=20261024081653"></script>
+<script src="./js/orbit.js?v=20261024081653"></script>
+<script src="./js/classify.js?v=20261024081653"></script>
+<script src="./js/scanner.js?v=20261024081653"></script>
+<script src="./js/app.js?v=20261024081653"></script>
 </body>
 </html>

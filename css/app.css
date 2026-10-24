@@ -463,3 +463,58 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .qpill { white-space: nowrap; }
 .sold-line { font-size: 13.5px; font-weight: 600; margin: 8px 0 0; color: var(--faint); }
 #su-chips { margin: -2px 0 8px; }
+
+/* ---------- Duo Stock (Watches → Duo) ---------- */
+.duo-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer; border: 0.5px solid var(--line); background: linear-gradient(135deg, rgba(var(--accent-rgb), .16), var(--card) 70%); min-height: 64px; }
+.duo-card:active { transform: scale(.985); }
+.duo-card .t { display: block; font-size: 16px; font-weight: 800; }
+.duo-card .d { display: block; }
+.duo-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-dim); color: var(--accent-2); }
+.duo-ic svg { width: 22px; height: 22px; }
+.duo-go { font-size: 26px; color: var(--accent-2); line-height: 1; }
+.duo-row { display: flex; align-items: flex-end; gap: 10px; }
+.duo-row .field { margin-top: 10px; }
+.duo-row .btn.buy { flex: none; min-width: 120px; }
+#duo-zip { font-size: 18px; letter-spacing: .08em; }
+.dz-bar { display: flex; align-items: center; gap: 8px; margin: 4px 2px 6px; font-size: 14px; }
+.dz-bar b { font-size: 17px; letter-spacing: .04em; }
+.dz-when { color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.dz-sum { margin: 2px 2px 8px; font-size: 13.5px; color: var(--muted); }
+.dz-sum.hot { color: var(--text); }
+.dz-sum.hot b { color: var(--live); }
+.dz-fail { border-color: var(--red-dim); }
+.dz-fail .t { color: var(--amber); }
+.dz-wrap { padding: 0; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; max-width: 100%; margin-bottom: 6px; }
+.dz-tbl { display: table; max-width: none; overflow: visible; border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 12px; }
+.dz-tbl th, .dz-tbl td { padding: 0; border-bottom: 0.5px solid var(--hair); text-align: center; vertical-align: middle; }
+.dz-tbl thead th { background: var(--card-2); font-size: 11px; font-weight: 700; color: var(--muted); padding: 6px 4px; white-space: nowrap; }
+.dz-tbl thead th.emph { color: var(--text); background: rgba(var(--accent-rgb), .22); font-size: 13px; font-weight: 800; box-shadow: inset 0 -2px 0 var(--accent); }
+.dz-tbl thead th.dim { opacity: .75; }
+.dz-tbl thead th.sub { font-size: 10.5px; font-weight: 600; box-shadow: none; }
+.dz-tbl .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0; border: 1px solid rgba(128,128,128,.7); }
+.dz-tbl .sw.w { background: #f4f1ea; } .dz-tbl .sw.n { background: #1b2a4a; }
+.dz-tbl th.store { position: sticky; left: 0; z-index: 2; background: var(--card); text-align: left; min-width: 118px; max-width: 128px; padding: 7px 8px; border-right: 0.5px solid var(--hair); box-shadow: 4px 0 6px -4px rgba(0,0,0,.35); }
+.dz-tbl thead th.store { background: var(--card-2); z-index: 3; font-size: 11px; }
+.dz-tbl th.store a { color: inherit; text-decoration: none; display: block; }
+.dz-tbl .sn { display: block; font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.dz-tbl .sl { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; margin-top: 2px; line-height: 1.25; }
+.dz-tbl .ny { display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 700; color: var(--amber); background: rgba(224,176,90,.16); border-radius: 6px; padding: 1px 5px; }
+.dz-tbl td { padding: 4px 3px; min-width: 80px; }
+.dz-tbl td.emph { background: rgba(var(--accent-rgb), .07); }
+.dz-tbl td.dim { opacity: .82; }
+.dz { white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 44px; border-radius: 9px; font-size: 11px; font-weight: 700; text-decoration: none; padding: 4px 3px; line-height: 1.15; }
+.dz small { font-size: 10px; font-weight: 600; opacity: .85; margin-top: 2px; }
+td.emph .dz { font-size: 11.5px; }
+.dz.av { background: rgba(var(--live-rgb), .20); color: var(--live); border: 1px solid rgba(var(--live-rgb), .55); }
+.dz.un { background: rgba(118,118,128,.16); color: var(--muted); border: 1px solid transparent; font-weight: 600; }
+.dz.nd { background: transparent; color: var(--faint); border: 1px dashed var(--hair); font-weight: 600; }
+[data-theme="light"] .dz.av { color: #14632f; background: rgba(var(--live-rgb), .16); }
+.dz-tbl tr.hit th.store { box-shadow: inset 3px 0 0 var(--live), 4px 0 6px -4px rgba(0,0,0,.35); }
+.dz-tbl tr.nyrow { opacity: .8; }
+.dz-tbl tr.online th.store { background: var(--card-2); }
+.dz-tbl tr.online td { background-color: rgba(var(--accent-rgb), .04); }
+.dz-err { display: block; padding: 10px 12px; text-align: left; color: var(--amber); font-weight: 600; font-size: 13px; }
+@media (max-width: 380px) { .dz-tbl th.store { min-width: 104px; max-width: 112px; padding: 6px; } .dz-tbl td { min-width: 76px; } .duo-row .btn.buy { min-width: 104px; } }
+#w-seg { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+#w-seg::-webkit-scrollbar { display: none; }
+#w-seg button { flex: 1 0 auto; padding: 0 5px; font-size: 13px; white-space: nowrap; }
