@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var t=localStorage.getItem('rd-theme')||'dark';var d=t==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=d;})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024085410">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024085410">
-<link rel="stylesheet" href="./css/app.css?v=20261024085410">
-<link rel="stylesheet" href="./css/fold.css?v=20261024085410">
+<link rel="stylesheet" href="./css/tokens.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024201604">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024201604">
+<link rel="stylesheet" href="./css/app.css?v=20261024201604">
+<link rel="stylesheet" href="./css/fold.css?v=20261024201604">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -115,9 +115,54 @@
     <div class="dash-grid" id="dash-stats"></div>
     <div id="dash-cards"></div>
   </section>
+  <section class="screen" id="tab-duo" hidden>
+    <h2 class="section">Duo Stock</h2>
+    <div class="card dz-status" id="duo-status" role="status" aria-live="polite"></div>
+    <div class="dz-cols">
+    <div class="card dz-want" id="duo-want">
+      <p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>What I want</p>
+      <div class="dz-chips two" id="duo-colors" role="group" aria-label="Colors"></div>
+      <div class="dz-chips four" id="duo-sizes" role="group" aria-label="Memory"></div>
+      <div class="dz-carrier" id="duo-carrier" role="group" aria-label="Carrier"></div>
+      <p class="hint" id="duo-carrier-note" hidden></p>
+      <form id="duo-form" autocomplete="off" class="dz-zip">
+        <span class="dz-zip-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <input id="duo-zip" name="zip" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="ZIP code" autocomplete="postal-code" enterkeyhint="search" aria-label="ZIP code">
+      </form>
+      <div class="dz-line"><span class="dz-line-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg><span id="duo-cad-t">Check every 30s</span></span>
+        <span class="dz-step"><button type="button" id="duo-cad-minus" aria-label="Check less often">−</button><button type="button" id="duo-cad-plus" aria-label="Check more often">+</button></span></div>
+      <div class="dz-line"><span class="dz-line-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>Pause checking</span>
+        <button type="button" class="dz-switch" id="duo-pause" role="switch" aria-checked="false" aria-label="Pause checking"><i></i></button></div>
+      <p class="msg" id="duo-msg" role="status"></p>
+      <button type="button" class="btn dz-test" id="duo-test">Send a TEST ping to my phone</button>
+    </div>
+    <div class="card dz-stores" id="duo-stores"></div>
+    </div>
+    <div id="duo-out"></div>
+    <div class="dz-cta"><button type="button" class="btn buy dz-big" id="duo-go">Check now</button></div>
+  </section>
+  <section class="screen" id="tab-ps5" hidden>
+    <h2 class="section">PS5 Pro</h2>
+    <div class="ps-cols">
+    <div class="card ps-main" id="ps5-main"></div>
+    <div class="card ps-box" id="ps5-box"></div>
+    <div class="card ps-cap" id="ps5-cap">
+      <p class="dz-k">Alert rule</p>
+      <p class="d" id="ps5-rule"></p>
+      <form id="ps5-cap-form" class="ps-capf" autocomplete="off">
+        <label class="field grow" for="ps5-cap-in">Price cap ($)<input id="ps5-cap-in" type="text" inputmode="decimal" maxlength="7" placeholder="950" aria-label="Price cap in dollars"></label>
+        <button class="btn buy" type="submit" id="ps5-cap-save">Save cap</button>
+      </form>
+      <p class="msg" id="ps5-msg" role="status"></p>
+      <button type="button" class="btn dz-test" id="ps5-test">Send a TEST ping to my phone</button>
+    </div>
+    <div class="card ps-when" id="ps5-when"></div>
+    </div>
+    <div class="card" id="ps5-hist"></div>
+  </section>
   <section class="screen" id="tab-watches" hidden>
     <h2 class="section">Watches</h2>
-    <div class="seg" id="w-seg" style="margin-bottom:12px"><button data-v="list" class="on">Watch list</button><button data-v="favs" id="w-seg-favs">Favorites <span class="seg-badge fav" id="fav-count"></span></button><button data-v="alerts">Alerts <span class="seg-badge" id="badge"></span></button><button data-v="countdowns">Countdowns</button><button data-v="duo">Duo</button></div>
+    <div class="seg" id="w-seg" style="margin-bottom:12px"><button data-v="list" class="on">Watch list</button><button data-v="favs" id="w-seg-favs">Favorites <span class="seg-badge fav" id="fav-count"></span></button><button data-v="alerts">Alerts <span class="seg-badge" id="badge"></span></button><button data-v="countdowns">Countdowns</button></div>
     <div id="w-list">
     <div id="w-detail" hidden>
       <button type="button" class="back-link" id="wd-back">‹ All watches</button>
@@ -182,19 +227,6 @@
       <div class="actions" style="margin:0 0 12px"><button class="btn buy" id="cd-new" type="button">+ New countdown</button></div>
       <div id="cd-list"></div>
     </div>
-    </div>
-    <div id="w-duo" hidden>
-      <div class="card duo-form">
-        <p class="t">Duo Stock</p>
-        <p class="d">Live iPhone Duo pickup stock near a ZIP, plus online shipping. Read-only.</p>
-        <form id="duo-form" autocomplete="off" class="duo-row">
-          <label class="field grow" for="duo-zip">ZIP code<input id="duo-zip" name="zip" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="08872" autocomplete="postal-code" enterkeyhint="search"></label>
-          <button class="btn buy" type="submit" id="duo-go">Check stock</button>
-        </form>
-        <label class="check" style="margin-top:2px;min-height:40px"><input type="checkbox" id="duo-ny"> Include NY stores <small class="f">(skipped for tax)</small></label>
-        <p class="msg" id="duo-msg" role="status" style="margin-top:2px"></p>
-      </div>
-      <div id="duo-out"></div>
     </div>
   </section>
   <section class="screen" id="tab-phones" hidden>
@@ -353,6 +385,8 @@
 <button class="ask-orb" id="ask-open" type="button" aria-label="Ask Risky"><span class="ask-orb-glow"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span class="ask-orb-label">Ask</span></button>
 <nav class="tabbar" role="tablist">
   <button data-tab="home" role="tab" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button data-tab="duo" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Duo</button>
+  <button data-tab="ps5" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 10v4M6 12h4M16 11h.01M18 13h.01"/></svg>PS5 Pro</button>
   <button data-tab="watches" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M21 12h-2"/></svg><span class="badge" id="tab-badge"></span>Watches</button>
   <button data-tab="phones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>Items</button>
   <button data-tab="sales" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Sales</button>
@@ -581,10 +615,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261024085410"></script>
-<script src="./js/orbit.js?v=20261024085410"></script>
-<script src="./js/classify.js?v=20261024085410"></script>
-<script src="./js/scanner.js?v=20261024085410"></script>
-<script src="./js/app.js?v=20261024085410"></script>
+<script src="./js/config.js?v=20261024201604"></script>
+<script src="./js/orbit.js?v=20261024201604"></script>
+<script src="./js/classify.js?v=20261024201604"></script>
+<script src="./js/scanner.js?v=20261024201604"></script>
+<script src="./js/app.js?v=20261024201604"></script>
 </body>
 </html>

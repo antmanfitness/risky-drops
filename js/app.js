@@ -22,6 +22,7 @@
   const guessType = (name) => (ITEM_TYPES.find((t) => t.match && t.match.test(name || '')) || { id: 'other' }).id;
   const typeOfSale = (x) => x.item_type || guessType(x.item);
   const pickerHtml = () => ITEM_TYPES.map((t) => `<button type="button" class="tpick" role="listitem" data-itype="${t.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg><b>${t.label}</b><small>${t.hint}</small></button>`).join('');
+  const BUYNOW = new Set(['iphoneduo', 'ps5', 'ps5wm']);   // alert cards from these sources get a big 'Buy now' link (link only, never buys)
   const typeChip = (p) => `<span class="tchip">${esc(itemType(p.item_type).label.replace(/s$/, ''))}</span>`;
   let state = { status: null, alerts: [], flip: null, filter: 'all', tab: 'home', wsub: 'list', ssub: 'listings' };
 
@@ -109,14 +110,17 @@
 
   // ---------- tabs
   // Tabs: Home / Watches (list | alerts | countdowns) / Phones / Sales (listings | sold | comps). Settings = header gear, Ask = floating orb.
-  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], duo: ['watches', 'duo'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
+  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
   function show(tab, sub) {
     if (LEGACY[tab]) [tab, sub] = LEGACY[tab];
     state.tab = tab;
     document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'tab-' + tab));
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     $('#gear').classList.toggle('on', tab === 'settings');
-    $('#ask-open').hidden = tab === 'ask';
+    $('#ask-open').hidden = tab === 'ask' || tab === 'duo' || tab === 'ps5';   // the sticky Check now button lives where the orb floats
+    if (tab === 'duo' && typeof duoOpen === 'function') duoOpen();
+    if (tab === 'ps5' && typeof ps5Open === 'function') ps5Open();
+    const tb = document.querySelector(`.tabbar button[data-tab="${tab}"]`); if (tb && tb.scrollIntoView) tb.scrollIntoView({ inline: 'center', block: 'nearest' });
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (tab === 'phones' ? 'items' : tab) + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
     if (sub && tab === 'sales') showSub('s', sub);
@@ -129,14 +133,13 @@
   }
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
   $('#gear').addEventListener('click', () => show('settings'));
-  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns', 'duo'], s: ['listings', 'sold', 'comps'] };
+  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
   function showSub(g, v) {
     if (!SUBS[g].includes(v)) return; state[g + 'sub'] = v;
     document.querySelectorAll(`#${g}-seg button`).forEach((b) => b.classList.toggle('on', b.dataset.v === v));
     SUBS[g].forEach((x) => ($(`#${g}-${x}`).hidden = x !== v));
     if (g === 'w' && v === 'alerts') { localStorage.setItem('rd-seen', new Date().toISOString()); renderBadge(); }
     if (g === 'w' && v === 'favs' && typeof loadFavs === 'function') loadFavs();
-    if (g === 'w' && v === 'duo' && typeof duoOpen === 'function') duoOpen();
     if (g === 'w' && v !== 'list' && state.wdetail) { state.wdetail = null; if (typeof renderWatches === 'function') renderWatches(); }
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (g === 'w' ? 'watches' : 'sales') + '/' + v);
   }
@@ -539,9 +542,9 @@
         <div class="row"><p class="t grow">${esc(a.item || a.title)}</p><span class="pill ${esc(a.kind)}">${a.kind === 'test' ? 'Test' : a.kind === 'price_drop' ? 'Price drop' : 'Restock'}</span></div>
         ${where ? `<p class="d">${esc(where)}</p>` : ''}
         ${a.detail ? `<p class="d">${esc(a.detail)}</p>` : ''}
-        <p class="f">${esc(a.time_et || et(a.ts))}${a.backfilled ? ' · from watcher log' : ''}${a.pushed === false ? ' · push failed' : ''}</p>
+        <p class="f">${esc(a.time_et || et(a.ts))}${a.backfilled ? ' · from watcher log' : ''}${a.muted ? ' · quiet, not pushed' : a.pushed === false ? ' · push failed' : ''}</p>
         ${CFG ? soldLine(a) : ''}
-        <div class="actions">${link ? `<a class="btn buy" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>` : ''}${CFG && a.id && a.kind !== 'test' ? `<button class="btn" data-sold="${esc(a.id)}">${saleFor(a.id) || listingFor(a.id) ? 'Edit sale' : 'Mark as sold'}</button>` : ''}</div>
+        <div class="actions">${link ? (BUYNOW.has(a.source) ? `<a class="btn buy buynow" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${a.kind === 'test' ? 'Buy now (test) ↗' : 'Buy now ↗'}</a>` : `<a class="btn buy" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>`) : ''}${CFG && a.id && a.kind !== 'test' ? `<button class="btn" data-sold="${esc(a.id)}">${saleFor(a.id) || listingFor(a.id) ? 'Edit sale' : 'Mark as sold'}</button>` : ''}</div>
       </div>`;
     }).join('') || '<p class="empty">No alerts yet.</p>';
   }
@@ -1788,6 +1791,7 @@
       if (!state.flip) state.flip = await api('/api/flip');
       if (!localStorage.getItem('rd-seen')) localStorage.setItem('rd-seen', new Date().toISOString());
       renderFlip(); renderBadge(); renderV2();
+      if (state.tab === 'duo') duoRenderStatus(); if (state.tab === 'ps5') ps5Render();
       if (CFG && !favsLoaded) loadFavs();
     } catch (err) {
       if (/Access key/.test(err.message)) {
@@ -1797,108 +1801,237 @@
     }
     $('#boot').classList.add('gone');
   }
-  // ---------- Duo Stock (Watches → Duo): live iPhone Duo pickup stock near a ZIP. Read-only; it only checks and links to Apple.
-  // The page can't call Apple (CORS), so it queues the `duo_stock` command (rd_command); sync.py on the box asks Apple, caches ~30s per ZIP,
-  // and acks the result, which this view polls (rd_command_status) and renders. Apple failures show as "couldn't check", never as stock.
-  const duo = { zip: localStorage.getItem('rd-duo-zip') || '', ny: localStorage.getItem('rd-duo-ny') === '1', res: null, busy: false, req: 0, opened: false };
-  try { const l = JSON.parse(localStorage.getItem('rd-duo-last') || 'null'); if (l && l.zip) { duo.res = l; duo.saved = true; if (!duo.zip) duo.zip = l.zip; } } catch (e) { /* ignore */ }
-  const DUO_COLS = [['256GB', 'emph'], ['512GB', 'emph'], ['1TB', 'dim'], ['2TB', 'dim']];
+  // ---------- Duo Stock tab (top-level): what I want, the 12 nearest Apple stores, live stock, "Check now".
+  // The page can't call Apple (CORS), so it queues commands (rd_command); sync.py on the box answers them (fast path) and this view polls
+  // rd_command_status. `duo_stock` = a live lookup for a ZIP (read-only), `duo_prefs` = save what I want (models, dropped stores, interval,
+  // pause) for the box-side watcher /workspace/iphoneduo/duo_watch.py, which is what actually pings. Apple failures show as "couldn't check",
+  // never as stock. Nothing here adds to a cart or buys: "Buy now" is a plain link to Apple.
+  const DUO_SIZES = ['256GB', '512GB', '1TB', '2TB'], DUO_COLORS = ['Night Sky', 'Star White'];
+  const DUO_PRICE = { '256GB': 1999, '512GB': 2199, '1TB': 2599, '2TB': 3199 };   // Apple list prices
+  const DUO_PART = { '256GB|Star White': 'MK1E4LL/A', '256GB|Night Sky': 'MK1F4LL/A', '512GB|Star White': 'MK1G4LL/A', '512GB|Night Sky': 'MK1H4LL/A',
+    '1TB|Star White': 'MK1J4LL/A', '1TB|Night Sky': 'MK1L4LL/A', '2TB|Star White': 'MK1Q4LL/A', '2TB|Night Sky': 'MK1R4LL/A' };
+  const DUO_INFO = {}; Object.entries(DUO_PART).forEach(([k, p]) => { const [s, c] = k.split('|'); DUO_INFO[p] = { storage: s, color: c }; });
+  const DUO_SLUG = (p) => `https://www.apple.com/shop/buy-iphone/iphone-duo/7.6-inch-display-${DUO_INFO[p].storage.toLowerCase()}-${DUO_INFO[p].color.toLowerCase().replace(' ', '-')}`;
+  const DUO_ALL = Object.values(DUO_PART);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const duo = { zip: localStorage.getItem('rd-duo-zip') || '08872', res: null, busy: false, req: 0, opened: false, watcher: null, pending: null, saveT: 0, saveMsg: '' };
+  duo.prefs = { parts: DUO_ALL.slice(), dropped: [], cadence: 30, paused_until: 0 };
+  try { Object.assign(duo.prefs, JSON.parse(localStorage.getItem('rd-duo-prefs') || '{}')); } catch (e) { /* ignore */ }
+  try { const l = JSON.parse(localStorage.getItem('rd-duo-last') || 'null'); if (l && l.zip && l.stores) { duo.res = l; duo.saved = true; if (!localStorage.getItem('rd-duo-zip')) duo.zip = l.zip; } } catch (e) { /* ignore */ }
   const etTime = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
   const apple = (u) => /^https:\/\/www\.apple\.com\//.test(u || '') ? u : '';
+  const dmoney = (v) => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const dago = (ts) => { if (!ts) return ''; const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 90 ? `${s} sec ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
   const duoShip = (d) => { if (!/^\d{8}$/.test(d || '')) return ''; const dt = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)));
     const o = { timeZone: 'UTC', month: 'short', day: 'numeric' }; if (dt.getUTCFullYear() !== new Date().getFullYear()) o.year = '2-digit'; return new Intl.DateTimeFormat('en-US', o).format(dt).replace(/, (\d\d)$/, ' ’$1'); };
-  const duoChecked = (r) => r.checked_ts ? etTime.format(new Date(r.checked_ts * 1000)) + ' ET' : '';
-  function duoHead(parts) {
-    const g = DUO_COLS.map(([s, c]) => `<th colspan="2" class="${c}">${s}</th>`).join('');
-    const sub = parts.map((p) => `<th class="${/256|512/.test(p.storage) ? 'emph' : 'dim'} sub"><i class="sw ${p.color === 'Star White' ? 'w' : 'n'}"></i>${p.color === 'Star White' ? 'Star White' : 'Night Sky'}</th>`).join('');
-    return `<thead><tr><th class="store" rowspan="2">Store</th>${g}</tr><tr>${sub}</tr></thead>`;
-  }
-  function duoCell(p, v, store) {
-    const emph = /256|512/.test(p.storage) ? 'emph' : 'dim', link = apple(p.link);
-    const txt = v === 'available' ? 'Available' : v === 'unavailable' ? 'Unavailable' : 'No data';
-    const cls = v === 'available' ? 'av' : v === 'unavailable' ? 'un' : 'nd';
-    const tip = `${store} · iPhone Duo ${p.storage} ${p.color}: ${txt}`;
-    return `<td class="${emph}">${link ? `<a class="dz ${cls}" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${txt}</a>` : `<span class="dz ${cls}">${txt}</span>`}</td>`;
-  }
-  function duoOnlineRow(r) {
-    const o = r.online, zip = esc(r.zip);
-    const lead = `<th class="store"><span class="sn">Online</span><span class="sl">Ships to ${zip}</span></th>`;
-    if (!o) return `<tr class="online err">${lead}<td colspan="8"><span class="dz-err">Couldn't check online${r.online_error ? ': ' + esc(r.online_error.message) : ''}</span></td></tr>`;
-    return `<tr class="online">${lead}${r.parts.map((p) => {
-      const x = (o.items || {})[p.part] || {}, emph = /256|512/.test(p.storage) ? 'emph' : 'dim', link = apple(p.link);
-      const d = duoShip(x.date), txt = x.buyable === true ? 'Buyable' : x.buyable === false ? 'Not buyable' : 'No data';
-      const cls = x.buyable === true ? 'av' : x.buyable === false ? 'un' : 'nd';
-      const tip = `Online · iPhone Duo ${p.storage} ${p.color}: ${txt}${d ? ', ships ' + d : ''}`;
-      const inner = `${txt}${d ? `<small>${esc(d)}</small>` : ''}`;
-      return `<td class="${emph}">${link ? `<a class="dz ${cls} two" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${inner}</a>` : `<span class="dz ${cls} two">${inner}</span>`}</td>`;
-    }).join('')}</tr>`;
-  }
-  function duoStoreRow(s, r) {
-    const link = apple(s.link), meta = `${esc(s.city)}, ${esc(s.state)} ${esc(s.zip)}`;
-    const any = r.parts.some((p) => s.avail[p.part] === 'available');
-    const name = `<span class="sn">${esc(s.name)}</span><span class="sl">${meta}${s.dist != null ? ` · ${s.dist.toFixed(1)} mi` : ''}</span>${s.ny ? '<span class="ny">NY (skipped for tax)</span>' : ''}`;
-    const lead = `<th class="store">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Apple ${esc(s.name)} store page">${name}</a>` : name}</th>`;
-    return `<tr class="${any ? 'hit' : ''}${s.ny ? ' nyrow' : ''}">${lead}${r.parts.map((p) => duoCell(p, s.avail[p.part], 'Apple ' + s.name)).join('')}</tr>`;
-  }
-  function duoRender() {
-    const out = $('#duo-out'), r = duo.res; if (!out) return;
-    if (!r) { out.innerHTML = '<div class="card"><p class="d">Enter a ZIP code and tap Check stock. Nothing is checked until you do.</p></div>'; return; }
-    const age = r.checked_ts ? `<span class="dz-when">${duo.saved ? 'Last checked' : 'Checked'} at ${esc(duoChecked(r))}${r.cached && !duo.saved ? ' (cached)' : ''}</span>` : '';
-    const head = `<div class="dz-bar"><div class="grow"><b>${esc(r.zip)}</b> ${age}</div><button type="button" class="btn ghost" id="duo-refresh" ${duo.busy ? 'disabled' : ''}>${duo.busy ? 'Checking…' : 'Refresh'}</button></div>`;
-    if (r.ok === false && r.error) {
-      const bad = r.error.kind === 'bad_zip';
-      out.innerHTML = `${head}<div class="card dz-fail"><p class="t">${bad ? 'Check that ZIP' : 'Couldn’t check'}</p><p class="d">${esc(r.error.message)}.${bad ? '' : ' No stock is shown because it can’t be verified right now. Try again in a few minutes.'}</p></div>`;
-      return;
+  const duoSel = () => { const s = new Set(duo.prefs.parts || []); return { parts: s, colors: DUO_COLORS.filter((c) => DUO_SIZES.some((z) => s.has(DUO_PART[z + '|' + c]))), sizes: DUO_SIZES.filter((z) => DUO_COLORS.some((c) => s.has(DUO_PART[z + '|' + c]))) }; };
+  const duoPaused = () => (duo.prefs.paused_until || 0) * 1000 > Date.now();
+  async function quick(action, payload, ms) {
+    const c = await rpc('rd_command', { p_key: KEY, p_action: action, p_payload: payload || {} });
+    const t0 = Date.now();
+    for (;;) {
+      await sleep(Date.now() - t0 < 6000 ? 1200 : 2500);
+      const st = await rpc('rd_command_status', { p_key: KEY, p_id: c.id });
+      if (st && st.state === 'done') return st.result || {};
+      if (st && st.state === 'failed') throw new Error((st.result && st.result.error) || 'The box could not run that');
+      if (Date.now() - t0 > (ms || 60000)) throw new Error('The box hasn’t picked this up. Is it online?');
     }
-    const all = r.stores || [], shown = all.filter((s) => duo.ny || !s.ny), hidden = all.length - shown.length;
-    const avail = shown.filter((s) => r.parts.some((p) => s.avail[p.part] === 'available')).length;
-    let sum;
-    if (r.pickup_error) sum = `<div class="card dz-fail"><p class="t">Couldn’t check pickup stock</p><p class="d">${esc(r.pickup_error.message)}. Store stock isn’t shown because it can’t be verified right now.</p></div>`;
-    else sum = `<p class="dz-sum ${avail ? 'hot' : ''}">${shown.length} store${shown.length === 1 ? '' : 's'} near ${esc(r.zip)} · ${avail ? `<b>${avail} with Duo pickup</b>` : 'none with Duo pickup right now'}${hidden ? ` · ${hidden} NY hidden (skipped for tax)` : ''}</p>`;
-    const rows = duoOnlineRow(r) + (r.pickup_error ? '' : shown.map((s) => duoStoreRow(s, r)).join(''));
-    const note = (!r.pickup_error && all.length && !shown.length) ? '<p class="d" style="margin:8px 2px">Only NY stores came back. Turn on “Include NY stores” to see them.</p>' : '';
-    const quote = !r.pickup_error && !avail && shown.some((s) => s.quote) ? `<p class="hint" style="margin:6px 2px 0">Apple says: “${esc((shown.find((s) => s.quote) || {}).quote)}”</p>` : '';
-    out.innerHTML = `${head}${sum}<div class="dz-wrap card" tabindex="0" role="region" aria-label="iPhone Duo stock table, scroll sideways"><table class="dz-tbl">${duoHead(r.parts)}<tbody>${rows}</tbody></table></div>${note}${quote}
-      <p class="hint" style="margin:8px 2px 0">256GB and 512GB are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys. If the table doesn’t fit your screen, swipe it sideways.</p>`;
   }
+  const wInfo = () => { const a = duo.watcher, b = state.status && state.status.duo_watch; return (a && b) ? ((a.last_pass_ts || 0) >= (b.last_pass_ts || 0) ? a : b) : (a || b || null); };
+
+  function duoRenderStatus() {
+    const el = $('#duo-status'); if (!el) return;
+    const w = wInfo(), sel = duoSel(), n = sel.parts.size, paused = duoPaused() || (w && w.paused);
+    const age = w && w.last_pass_ts ? Math.round(Date.now() / 1000 - w.last_pass_ts) : null;
+    const stale = !paused && (age == null || age > Math.max(180, 3 * (duo.prefs.cadence || 30)));
+    const cls = paused ? 'pause' : stale ? 'warn' : 'ok';
+    const title = paused ? 'Paused' : stale ? (w ? 'Not responding' : 'Waiting for the box') : 'Watching';
+    const by = w && w.by_state ? Object.keys(w.by_state).sort().join(' ') : 'NJ PA DE NY';
+    const sub = `${n} model${n === 1 ? '' : 's'} · ${w ? w.stores : '45'} stores (${esc(by)}) · every ${duo.prefs.cadence || 30}s`;
+    const when = w && w.last_pass_ts ? `Last check ${esc(dago(w.last_pass_ts))} · ${esc(etTime.format(new Date(w.last_pass_ts * 1000)))} ET` : 'No check recorded yet.';
+    el.className = 'card dz-status ' + cls;
+    el.innerHTML = `<div class="dz-st-row"><span class="dz-dot" aria-hidden="true"></span><b class="grow">${title}</b><span class="dz-ok" aria-hidden="true">${paused ? '❚❚' : stale ? '!' : '✓'}</span></div>
+      <p class="d">${sub}</p><p class="f">${when}${paused ? ' · pauses auto-resume after 2 hours' : ''}${stale && w ? ' · the watcher on the box hasn’t checked recently' : ''}</p>`;
+  }
+  function duoRenderWant() {
+    const sel = duoSel();
+    $('#duo-colors').innerHTML = DUO_COLORS.map((c) => `<button type="button" class="dz-chip ${sel.colors.includes(c) ? 'on' : ''}" data-color="${c}" aria-pressed="${sel.colors.includes(c)}"><i class="sw ${c === 'Star White' ? 'w' : 'n'}"></i>${c}</button>`).join('');
+    $('#duo-sizes').innerHTML = DUO_SIZES.map((z) => `<button type="button" class="dz-chip sz ${sel.sizes.includes(z) ? 'on' : ''}" data-size="${z}" aria-pressed="${sel.sizes.includes(z)}"><b>${z}</b><small>${dmoney(DUO_PRICE[z])}</small></button>`).join('');
+    $('#duo-carrier').innerHTML = ['Unlocked', 'AT&T', 'T-Mobile', 'Verizon'].map((c, i) => `<button type="button" class="${i === 0 ? 'on' : 'nt'}" data-carrier="${esc(c)}" aria-pressed="${i === 0}" ${i ? 'aria-disabled="true"' : ''}>${esc(c)}${i ? '<small>not tracked</small>' : ''}</button>`).join('');
+    $('#duo-cad-t').textContent = `Check every ${duo.prefs.cadence || 30}s`;
+    $('#duo-cad-minus').disabled = (duo.prefs.cadence || 30) >= 300; $('#duo-cad-plus').disabled = (duo.prefs.cadence || 30) <= 30;
+    const p = duoPaused(); const sw = $('#duo-pause'); sw.setAttribute('aria-checked', p ? 'true' : 'false'); sw.classList.toggle('on', p);
+    const m = $('#duo-msg'); if (duo.saveMsg) { m.className = 'msg' + (/^Saved/.test(duo.saveMsg) ? '' : ' err'); m.textContent = duo.saveMsg; }
+  }
+  function duoHitChips(s, sel) {
+    return DUO_ALL.filter((p) => s.avail && s.avail[p] === 'available' && sel.parts.has(p)).map((p) => `<a class="dz-hit" href="${esc(DUO_SLUG(p))}" target="_blank" rel="noopener noreferrer">${esc(DUO_INFO[p].storage + ' ' + DUO_INFO[p].color)} ↗</a>`).join('');
+  }
+  function duoRenderStores() {
+    const el = $('#duo-stores'), r = duo.res, sel = duoSel(), dropped = new Set(duo.prefs.dropped || []);
+    if (!r) { el.innerHTML = '<p class="dz-k">Nearest Apple stores</p><p class="d">Tap Check now to load the stores near your ZIP.</p>'; return; }
+    if (r.ok === false && r.error) { el.innerHTML = `<p class="dz-k">Nearest Apple stores</p><p class="d dz-bad">${esc(r.error.message)}.</p>`; return; }
+    if (r.pickup_error) { el.innerHTML = `<p class="dz-k">Nearest Apple stores</p><p class="d dz-bad">Couldn’t check pickup stock: ${esc(r.pickup_error.message)}. Stock isn’t shown because it can’t be verified right now.</p>`; return; }
+    const rows = (r.stores || []).slice().sort((a, b) => (a.dist == null) - (b.dist == null) || a.dist - b.dist);
+    const watching = rows.filter((s) => !dropped.has(s.id)).length;
+    el.innerHTML = `<p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></svg>${rows.length} nearest Apple stores</p>
+      ${rows.map((s) => { const off = dropped.has(s.id), link = apple(s.link), chips = off ? '' : duoHitChips(s, sel);
+        return `<div class="dz-srow ${off ? 'off' : ''} ${chips ? 'hit' : ''}"><div class="grow"><a class="dz-sn" ${link ? `href="${esc(link)}" target="_blank" rel="noopener noreferrer"` : ''}>${esc(s.name)}</a><small>${esc(s.city)}, ${esc(s.state)} ${esc(s.zip)}${s.dist != null ? ` · ${s.dist.toFixed(2)} mi` : ''}${off ? ' · not alerting' : ''}</small>${chips ? `<div class="dz-hits">${chips}</div>` : ''}</div>
+          <button type="button" class="dz-x" data-drop="${esc(s.id)}" aria-label="${off ? 'Alert for' : 'Stop alerting for'} Apple ${esc(s.name)}" title="${off ? 'Add back' : 'Drop this store'}">${off ? '+' : '×'}</button></div>`; }).join('')}
+      <p class="hint">${watching} of ${rows.length} alert. The box watches all ${(wInfo() || {}).stores || 45} stores in NJ, PA, DE and NY; × only silences a store’s pings. Distances are from Apple.</p>`;
+  }
+  const dzCell = (p, v, store, sel) => {
+    const on = sel.parts.has(p.part), link = apple(p.link), cls = v === 'available' ? 'av' : v === 'unavailable' ? 'un' : 'nd', txt = v === 'available' ? 'Available' : v === 'unavailable' ? 'Unavailable' : 'No data';
+    const tip = `${store} · iPhone Duo ${p.storage} ${p.color}: ${txt}`;
+    return `<td class="${on ? 'emph' : 'dim'}">${link ? `<a class="dz ${cls}" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${txt}</a>` : `<span class="dz ${cls}">${txt}</span>`}</td>`;
+  };
+  function duoTable(r, sel) {
+    const parts = r.parts, th = DUO_SIZES.map((z) => `<th colspan="2" class="${sel.sizes.includes(z) ? 'emph' : 'dim'}">${z}</th>`).join('');
+    const sub = parts.map((p) => `<th class="${sel.parts.has(p.part) ? 'emph' : 'dim'} sub"><i class="sw ${p.color === 'Star White' ? 'w' : 'n'}"></i>${p.color}</th>`).join('');
+    const o = r.online, zip = esc(r.zip);
+    const onl = !o ? `<tr class="online err"><th class="store"><span class="sn">Online</span><span class="sl">Ships to ${zip}</span></th><td colspan="8"><span class="dz-err">Couldn't check online${r.online_error ? ': ' + esc(r.online_error.message) : ''}</span></td></tr>`
+      : `<tr class="online"><th class="store"><span class="sn">Online</span><span class="sl">Ships to ${zip}</span></th>${parts.map((p) => {
+        const x = (o.items || {})[p.part] || {}, link = apple(p.link), d = duoShip(x.date), txt = x.buyable === true ? 'Buyable' : x.buyable === false ? 'Not buyable' : 'No data';
+        const cls = x.buyable === true ? 'av' : x.buyable === false ? 'un' : 'nd', inner = `${txt}${d ? `<small>${esc(d)}</small>` : ''}`, tip = `Online · iPhone Duo ${p.storage} ${p.color}: ${txt}${d ? ', ships ' + d : ''}`;
+        return `<td class="${sel.parts.has(p.part) ? 'emph' : 'dim'}">${link ? `<a class="dz ${cls} two" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${inner}</a>` : `<span class="dz ${cls} two">${inner}</span>`}</td>`; }).join('')}</tr>`;
+    const dropped = new Set(duo.prefs.dropped || []);
+    const rows = (r.pickup_error ? [] : r.stores || []).map((s) => {
+      const link = apple(s.link), any = parts.some((p) => sel.parts.has(p.part) && s.avail[p.part] === 'available'), name = `<span class="sn">${esc(s.name)}</span><span class="sl">${esc(s.city)}, ${esc(s.state)} ${esc(s.zip)}${s.dist != null ? ` · ${s.dist.toFixed(1)} mi` : ''}</span>`;
+      return `<tr class="${any ? 'hit' : ''}${dropped.has(s.id) ? ' nyrow' : ''}"><th class="store">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Apple ${esc(s.name)} store page">${name}</a>` : name}</th>${parts.map((p) => dzCell(p, s.avail[p.part], 'Apple ' + s.name, sel)).join('')}</tr>`; }).join('');
+    return `<div class="dz-wrap card" tabindex="0" role="region" aria-label="iPhone Duo stock table, scroll sideways"><table class="dz-tbl"><thead><tr><th class="store" rowspan="2">Store</th>${th}</tr><tr>${sub}</tr></thead><tbody>${onl}${rows}</tbody></table></div>`;
+  }
+  function duoRenderOut() {
+    const out = $('#duo-out'), r = duo.res; if (!out) return;
+    if (!r || (r.ok === false && r.error)) { out.innerHTML = ''; return; }
+    const sel = duoSel(), all = r.stores || [];
+    const avail = all.filter((s) => r.parts.some((p) => sel.parts.has(p.part) && s.avail[p.part] === 'available')).length;
+    const when = r.checked_ts ? `${duo.saved ? 'Last checked' : 'Checked'} ${esc(etTime.format(new Date(r.checked_ts * 1000)))} ET${r.cached && !duo.saved ? ' (cached)' : ''}` : '';
+    const quote = !r.pickup_error && !avail && all.some((s) => s.quote) ? ` Apple says: “${esc((all.find((s) => s.quote) || {}).quote)}”.` : '';
+    const sum = r.pickup_error ? '' : `<p class="dz-sum ${avail ? 'hot' : ''}">${avail ? `<b>${avail} store${avail === 1 ? '' : 's'} with your Duo for pickup</b>` : 'None of your selected models are in stock for pickup right now.'} <span class="dz-when">${when}.${quote}</span></p>`;
+    out.innerHTML = `${sum}<details class="dz-det" ${avail ? 'open' : ''}><summary>Full stock table (${all.length} stores + online)</summary>${duoTable(r, sel)}
+      <p class="hint" style="margin:8px 2px 0">Your colors and sizes are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys.</p></details>`;
+  }
+  const duoRender = () => { duoRenderStatus(); duoRenderWant(); duoRenderStores(); duoRenderOut(); };
   async function duoRun(force) {
     const zip = ($('#duo-zip').value || '').trim(), msg = $('#duo-msg');
-    if (!/^\d{5}$/.test(zip)) { msg.className = 'msg err'; msg.textContent = 'Enter a 5-digit ZIP code.'; return; }
+    if (!/^\d{5}$/.test(zip)) { msg.className = 'msg err'; msg.textContent = 'Enter a 5-digit ZIP code.'; $('#duo-zip').focus(); return; }
     if (!CFG || !KEY) { msg.className = 'msg err'; msg.textContent = 'Open the app with your access link first.'; return; }
     const my = ++duo.req; duo.zip = zip; localStorage.setItem('rd-duo-zip', zip);
-    duo.busy = true; $('#duo-go').disabled = true; msg.className = 'msg'; msg.textContent = 'Asking Apple through the box…'; duoRender();
+    duo.busy = true; $('#duo-go').disabled = true; $('#duo-go').textContent = 'Checking…'; msg.className = 'msg'; msg.textContent = 'Asking Apple through the box…';
     try {
-      const c = await rpc('rd_command', { p_key: KEY, p_action: 'duo_stock', p_payload: { zip, force: !!force } });
-      const t0 = Date.now();
-      for (;;) {
-        await new Promise((res) => setTimeout(res, Date.now() - t0 < 6000 ? 1500 : 2500));
-        if (my !== duo.req) return;   // a newer lookup took over
-        const st = await rpc('rd_command_status', { p_key: KEY, p_id: c.id });
-        if (st && st.state === 'done') { const r = st.result || {}; if (r.zip === zip || r.ok === false) { duo.res = { ...r, zip: r.zip || zip }; duo.saved = false; if (r.ok) { try { localStorage.setItem('rd-duo-last', JSON.stringify(duo.res)); } catch (e) { /* quota */ } } } msg.textContent = ''; break; }
-        if (st && st.state === 'failed') { const e = (st.result && st.result.error) || 'The box could not run that'; duo.res = { ok: false, zip, error: { kind: /ZIP/.test(e) ? 'bad_zip' : 'box', message: e } }; duo.saved = false; msg.textContent = ''; break; }
-        const waited = Date.now() - t0;
-        if (waited > 60000) throw new Error('The box hasn’t picked this up. Is it online? Showing the last saved result, if any.');
-        if (waited > 15000) msg.textContent = 'Still waiting for the box…';
-      }
-    } catch (err) { if (my === duo.req) { msg.className = 'msg err'; msg.textContent = err.message === 'Failed to fetch' ? 'No connection. Showing the last saved result, if any.' : err.message; } }
-    if (my === duo.req) { duo.busy = false; $('#duo-go').disabled = false; duoRender(); }
+      const r = await quick('duo_stock', { zip, force: !!force }, 70000);
+      if (my !== duo.req) return;   // a newer lookup took over
+      if (r.zip === zip || r.ok === false) { duo.res = { ...r, zip: r.zip || zip }; duo.saved = false; if (r.ok) { try { localStorage.setItem('rd-duo-last', JSON.stringify(duo.res)); } catch (e) { /* quota */ } } }
+      if (r.watcher) duo.watcher = r.watcher;
+      if (r.prefs && !duo.pending) { duo.prefs = r.prefs; localStorage.setItem('rd-duo-prefs', JSON.stringify(duo.prefs)); }
+      msg.textContent = '';
+    } catch (err) {
+      if (my === duo.req) { const e = err.message; if (/ZIP/.test(e)) duo.res = { ok: false, zip, error: { kind: 'bad_zip', message: e } }; msg.className = 'msg err'; msg.textContent = e === 'Failed to fetch' ? 'No connection. Showing the last saved result, if any.' : e; }
+    }
+    if (my === duo.req) { duo.busy = false; $('#duo-go').disabled = false; $('#duo-go').textContent = 'Check now'; duoRender(); }
+  }
+  // Saving what I want: instant in the UI + localStorage, then one debounced `duo_prefs` command with only the changed fields.
+  function duoSave(fields) {
+    if ('parts' in fields) duo.prefs.parts = fields.parts; if ('dropped' in fields) duo.prefs.dropped = fields.dropped; if ('cadence' in fields) duo.prefs.cadence = fields.cadence;
+    if ('paused' in fields) duo.prefs.paused_until = fields.paused ? Math.floor(Date.now() / 1000) + 7200 : 0;
+    localStorage.setItem('rd-duo-prefs', JSON.stringify(duo.prefs));
+    duo.pending = Object.assign(duo.pending || {}, fields); duo.saveMsg = ''; duoRender();
+    clearTimeout(duo.saveT); duo.saveT = setTimeout(async () => {
+      const body = duo.pending; duo.pending = null;
+      try { const r = await quick('duo_prefs', body, 60000); if (r.prefs && !duo.pending) { duo.prefs = r.prefs; localStorage.setItem('rd-duo-prefs', JSON.stringify(r.prefs)); } if (r.watcher) duo.watcher = r.watcher; duo.saveMsg = 'Saved to the box ✓'; }
+      catch (e) { duo.saveMsg = 'Not saved yet: ' + (e.message === 'Failed to fetch' ? 'no connection' : e.message); }
+      duoRender();
+    }, 700);
+  }
+  function duoToggle(kind, val) {
+    const sel = duoSel(); let colors = sel.colors.slice(), sizes = sel.sizes.slice();
+    const flip = (a, v) => (a.includes(v) ? a.filter((x) => x !== v) : a.concat(v));
+    if (kind === 'color') colors = flip(colors, val); else sizes = flip(sizes, val);
+    if (!colors.length || !sizes.length) { toast('Pick at least one color and one size.'); return; }
+    duoSave({ parts: DUO_ALL.filter((p) => colors.includes(DUO_INFO[p].color) && sizes.includes(DUO_INFO[p].storage)) });
   }
   function duoOpen() {
-    if (!duo.opened) { duo.opened = true; $('#duo-zip').value = duo.zip; $('#duo-ny').checked = duo.ny; }
+    if (!duo.opened) {
+      duo.opened = true; $('#duo-zip').value = duo.zip;
+      if (CFG && KEY) quick('duo_prefs', {}, 60000).then((r) => { if (r.prefs && !duo.pending) { duo.prefs = r.prefs; localStorage.setItem('rd-duo-prefs', JSON.stringify(r.prefs)); } if (r.watcher) duo.watcher = r.watcher; duoRender(); }).catch(() => {});
+    }
     duoRender();
+    if (CFG && KEY && !duo.busy && /^\d{5}$/.test(duo.zip) && (!duo.res || Date.now() / 1000 - (duo.res.checked_ts || 0) > 120)) duoRun(false);
   }
   if (CFG) {
-    $('#duo-form').addEventListener('submit', (e) => { e.preventDefault(); duoRun(false); });
-    $('#duo-out').addEventListener('click', (e) => { if (e.target.closest('#duo-refresh') && !duo.busy) { $('#duo-zip').value = duo.res && duo.res.zip || $('#duo-zip').value; duoRun(true); } });
-    $('#duo-ny').addEventListener('change', (e) => { duo.ny = e.target.checked; localStorage.setItem('rd-duo-ny', duo.ny ? '1' : '0'); duoRender(); });
-    $('#duo-card').addEventListener('click', () => showSub('w', 'duo'));
-  } else { $('#duo-card').hidden = true; const b = document.querySelector('#w-seg [data-v="duo"]'); if (b) b.hidden = true; }
+    $('#duo-form').addEventListener('submit', (e) => { e.preventDefault(); duoRun(false); document.activeElement.blur(); });
+    $('#duo-zip').addEventListener('change', () => { if (/^\d{5}$/.test($('#duo-zip').value.trim())) duoRun(false); });
+    $('#duo-go').addEventListener('click', () => { if (!duo.busy) duoRun(true); });
+    $('#duo-colors').addEventListener('click', (e) => { const b = e.target.closest('[data-color]'); if (b) duoToggle('color', b.dataset.color); });
+    $('#duo-sizes').addEventListener('click', (e) => { const b = e.target.closest('[data-size]'); if (b) duoToggle('size', b.dataset.size); });
+    $('#duo-carrier').addEventListener('click', (e) => { const b = e.target.closest('[data-carrier]'); if (!b || !b.classList.contains('nt')) return;
+      const n = $('#duo-carrier-note'); n.hidden = false; n.textContent = `${b.dataset.carrier} models aren’t tracked: only the unlocked iPhone Duo is checked (no carrier part numbers are known).`; });
+    $('#duo-cad-minus').addEventListener('click', () => duoSave({ cadence: Math.min(300, (duo.prefs.cadence || 30) + 15) }));
+    $('#duo-cad-plus').addEventListener('click', () => duoSave({ cadence: Math.max(30, (duo.prefs.cadence || 30) - 15) }));
+    $('#duo-pause').addEventListener('click', () => duoSave({ paused: !duoPaused() }));
+    $('#duo-stores').addEventListener('click', (e) => { const b = e.target.closest('[data-drop]'); if (!b) return;
+      const d = new Set(duo.prefs.dropped || []); if (d.has(b.dataset.drop)) d.delete(b.dataset.drop); else d.add(b.dataset.drop); duoSave({ dropped: [...d] }); });
+    $('#duo-test').addEventListener('click', async () => {
+      if (!confirm('Send a TEST ping to your phone? It is labelled TEST ONLY and links to the real Apple page.')) return;
+      const m = $('#duo-msg'); m.className = 'msg'; m.textContent = 'Sending the test ping…';
+      try { await quick('test_notify', { which: 'duo' }, 60000); m.textContent = 'TEST ping sent. Check your phone.'; } catch (e) { m.className = 'msg err'; m.textContent = e.message; }
+    });
+    $('#duo-card').addEventListener('click', () => show('duo'));
+  } else { $('#duo-card').hidden = true; document.querySelectorAll('.tabbar [data-tab="duo"], .tabbar [data-tab="ps5"]').forEach((b) => (b.hidden = true)); }
+
+  // ---------- PS5 Pro tab: Walmart item 18235967161 (New only pings; open box is shown separately). Real data from the box's wm_state.json / wm.log.
+  const ps5 = { d: null, busy: false, opened: false };
+  const ps5Data = () => ps5.d || (state.status && state.status.ps5pro) || null;
+  function ps5Render() {
+    const d = ps5Data(); if (!d) { $('#ps5-main').innerHTML = '<p class="dz-k">Walmart · PS5 Pro (New)</p><p class="d">No Walmart reading yet. The box sends it with the next status update.</p>'; return; }
+    const stale = d.last_check_ts && Date.now() / 1000 - d.last_check_ts > 900;
+    const NS = { in_stock_under_cap: ['in', 'In stock', 'At or under your cap: you get pinged.'], in_stock_over_cap: ['over', 'In stock, over your cap', 'Above the cap, so no ping.'], out_of_stock: ['out', 'Out of stock', 'Waiting for it to come back.'] }[d.new_status] || ['nd', 'No reading yet', ''];
+    const link = /^https:\/\/www\.walmart\.com\//.test(d.url || '') ? d.url : '';
+    $('#ps5-main').className = 'card ps-main ' + NS[0];
+    $('#ps5-main').innerHTML = `<p class="dz-k">Walmart · PS5 Pro · New (not open box)</p>
+      <p class="ps-state"><span class="dz-dot" aria-hidden="true"></span>${esc(NS[1])}</p>
+      <p class="ps-price">${d.new ? dmoney(d.new.price) : '—'}<small>${d.new ? 'price shown for New' : ''}</small></p>
+      <p class="d">${esc(NS[2])}${d.seller ? ` Seller: ${esc(d.seller)}.` : ''}</p>
+      ${link ? `<a class="btn buy dz-big" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Open Walmart page ↗</a>` : ''}`;
+    const ob = d.open_box;
+    $('#ps5-box').innerHTML = `<p class="dz-k">Open box · separate</p><p class="ps-state sm ${ob && ob.status === 'IN_STOCK' ? 'in' : 'out'}"><span class="dz-dot" aria-hidden="true"></span>${ob ? (ob.status === 'IN_STOCK' ? 'In stock' : 'Out of stock') : 'Not listed'}${ob ? ` · ${dmoney(ob.price)}` : ''}</p>
+      <p class="hint">Open-box units are shown for reference only. They never trigger a ping.</p>`;
+    $('#ps5-when').innerHTML = `<p class="dz-k">Last checked</p><p class="ps-when-t ${stale ? 'warn' : ''}">${esc(d.last_check_et || 'No check yet')}</p>
+      <p class="d">${d.last_check_ts ? esc(dago(d.last_check_ts)) + ' · ' : ''}${d.interval_s ? `checks about every ${Math.round(d.interval_s / 60 * 10) / 10} min (${d.interval_s}s between checks)` : esc(d.interval_note || '')}</p>${stale ? '<p class="msg err">No Walmart check for over 15 minutes. The watcher may be down or blocked.</p>' : ''}`;
+    $('#ps5-rule').innerHTML = `Pings only when <b>New</b> (not open box) goes in stock at or under <b>${dmoney(d.cap)}</b>. Your target is about $900. Each ping repeats every minute (up to 5 times) while it’s still in stock.`;
+    const ci = $('#ps5-cap-in'); if (document.activeElement !== ci) ci.value = d.cap;
+    const row = (x) => `<li><span class="when">${esc(x.et)}</span><span class="txt">${esc(x.text)}</span></li>`;
+    const oth = Object.entries(d.other_stores || {}).map(([k, v]) => `<li><span class="when">${esc({ psd: 'PlayStation Direct', bestbuy: 'Best Buy', amazon: 'Amazon' }[k] || k)}</span><span class="txt">${esc(v.text)} <small>${esc(v.et)}</small></span></li>`).join('');
+    $('#ps5-hist').innerHTML = `<p class="dz-k">Status changes</p><ul class="ps-hist">${(d.changes || []).map(row).join('') || '<li><span class="txt">Nothing yet.</span></li>'}</ul>
+      <details class="dz-det"><summary>Recent checks (last ${(d.history || []).length})</summary><ul class="ps-hist">${(d.history || []).map(row).join('')}</ul></details>
+      ${oth ? `<p class="dz-k" style="margin-top:12px">Other stores (last reading)</p><ul class="ps-hist">${oth}</ul>` : ''}`;
+  }
+  async function ps5Refresh() {
+    if (!CFG || !KEY || ps5.busy) return; ps5.busy = true;
+    try { ps5.d = await quick('ps5_pro', {}, 60000); } catch (e) { /* the status feed still shows the last data */ }
+    ps5.busy = false; ps5Render();
+  }
+  function ps5Open() { ps5Render(); if (!ps5.opened || !ps5.d || Date.now() / 1000 - (ps5.d.now || 0) > 60) { ps5.opened = true; ps5Refresh(); } }
+  if (CFG) {
+    $('#ps5-cap-form').addEventListener('submit', async (e) => {
+      e.preventDefault(); const v = parseFloat(($('#ps5-cap-in').value || '').replace(/[$,]/g, '')), m = $('#ps5-msg');
+      if (!isFinite(v) || v < 100 || v > 3000) { m.className = 'msg err'; m.textContent = 'Enter a price cap from $100 to $3,000.'; return; }
+      m.className = 'msg'; m.textContent = 'Saving…'; $('#ps5-cap-save').disabled = true;
+      try { ps5.d = await quick('ps5_pro', { cap: v }, 60000); m.textContent = `Saved: pings at or under ${dmoney(ps5.d.cap)} ✓`; } catch (err) { m.className = 'msg err'; m.textContent = err.message; }
+      $('#ps5-cap-save').disabled = false; ps5Render();
+    });
+    $('#ps5-test').addEventListener('click', async () => {
+      if (!confirm('Send a TEST ping to your phone? It is labelled TEST and links to the real Walmart page.')) return;
+      const m = $('#ps5-msg'); m.className = 'msg'; m.textContent = 'Sending the test ping…';
+      try { await quick('test_notify', { which: 'ps5' }, 60000); m.textContent = 'TEST ping sent. Check your phone.'; } catch (err) { m.className = 'msg err'; m.textContent = err.message; }
+    });
+  }
 
   const route = () => { const [h, hs, h3] = location.hash.slice(1).split('/');
     if (h === 'watches' && hs === 'w' && h3) { state.wdetail = decodeURIComponent(h3); show('watches', 'list'); history.replaceState(null, '', location.pathname + location.search + '#watches/w/' + h3); renderWatches(); return; }
     if (state.wdetail) { state.wdetail = null; if (state.status) renderWatches(); }
+    if (h === 'watches' && hs === 'duo') { show('duo'); return; }
     if (h === 'friends') { frDetail = hs && /^\d+$/.test(hs) ? +hs : null; show('friends', hs || null); return; }
-    if (['home', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
+    if (['home', 'duo', 'ps5', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
   if (MODE === 'admin') {
     route(); window.addEventListener('hashchange', route);
     load();

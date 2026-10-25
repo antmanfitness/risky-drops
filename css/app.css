@@ -62,10 +62,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
 /* floating glass bottom tab bar */
 .tabbar { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom));
-  width: min(440px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 6px; border-radius: 26px;
+  width: min(440px, calc(100vw - 24px)); display: flex; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; overscroll-behavior-x: contain; padding: 6px; border-radius: 26px;
   background: var(--glass); border: 0.5px solid var(--hair); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
-  box-shadow: 0 10px 30px rgba(0,0,0,.35); overflow: visible; max-width: calc(100vw - 24px); }
-.tabbar button { min-width: 0; min-height: 52px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35); max-width: calc(100vw - 24px); }
+.tabbar::-webkit-scrollbar { display: none; }
+.tabbar button { flex: 0 0 18%; scroll-snap-align: center; min-width: 0; min-height: 52px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; border-radius: 20px;
   display: grid; place-items: center; gap: 2px; cursor: pointer; position: relative; padding: 4px 0; }
 .tabbar button svg { width: 24px; height: 24px; }
 .tabbar button.on { color: var(--accent); background: rgba(var(--accent-rgb), .14); }
@@ -518,3 +519,81 @@ td.emph .dz { font-size: 11.5px; }
 #w-seg { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 #w-seg::-webkit-scrollbar { display: none; }
 #w-seg button { flex: 1 0 auto; padding: 0 5px; font-size: 13px; white-space: nowrap; }
+
+/* ---- v7: Duo Stock + PS5 Pro tabs (Oct 24 2026). Reference layout: status card, WHAT I WANT, nearest stores, sticky blue Check now. ---- */
+#tab-duo, #tab-ps5 { --dz-blue: #3b82f6; --dz-blue-2: #2563eb; --dz-chip: rgba(59,130,246,.9); }
+[data-theme="light"] #tab-duo, [data-theme="light"] #tab-ps5 { --dz-blue: #2563eb; --dz-blue-2: #1d4ed8; --dz-chip: #2563eb; }
+.dz-k { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--muted); font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.dz-k svg { width: 17px; height: 17px; flex: none; }
+.dz-status { border-radius: 20px; padding: 16px 18px; }
+.dz-st-row { display: flex; align-items: center; gap: 10px; }
+.dz-st-row b { font-size: 20px; letter-spacing: -.01em; }
+.dz-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 4px rgba(var(--live-rgb), .18); }
+.dz-status.warn .dz-dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(224,176,90,.2); }
+.dz-status.pause .dz-dot { background: var(--muted); box-shadow: none; }
+.dz-ok { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--live); color: #03150b; font-size: 14px; font-weight: 900; line-height: 1; }
+.dz-status.warn .dz-ok { background: var(--amber); } .dz-status.pause .dz-ok { background: var(--card-2); color: var(--muted); font-size: 9px; letter-spacing: -1px; }
+.dz-status .d { margin-top: 6px; font-size: 15px; }
+.dz-want, .dz-stores { border-radius: 20px; padding: 16px 16px 14px; }
+.dz-chips { display: grid; gap: 10px; margin-bottom: 10px; }
+.dz-chips.two { grid-template-columns: 1fr 1fr; } .dz-chips.four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.dz-chip { min-height: 48px; border-radius: 24px; border: 1px solid var(--hair); background: var(--card-2); color: var(--muted); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; }
+.dz-chip.on { background: var(--dz-chip); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(59,130,246,.28); }
+.dz-chip.sz { flex-direction: column; gap: 0; min-height: 56px; border-radius: 22px; }
+.dz-chip.sz b { font-size: 15px; white-space: nowrap; letter-spacing: -.2px; } .dz-chip.sz { padding: 0 2px; } .dz-chip.sz small { font-size: 11px; font-weight: 600; opacity: .85; }
+.dz-chip .sw { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(128,128,128,.7); }
+.dz-chip .sw.w { background: #f4f1ea; } .dz-chip .sw.n { background: #1b2a4a; }
+.dz-carrier { display: flex; gap: 2px; padding: 3px; border-radius: 14px; background: rgba(118,118,128,.24); margin-bottom: 4px; }
+.dz-carrier button { flex: 1 1 0; min-width: 0; min-height: 44px; border: 0; border-radius: 11px; background: transparent; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; display: grid; place-items: center; align-content: center; padding: 0 2px; }
+.dz-carrier button.on { background: var(--card-2); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.dz-carrier button.nt { color: var(--muted); } .dz-carrier button small { font-size: 9.5px; font-weight: 600; color: var(--faint); line-height: 1.1; }
+.dz-zip { display: flex; align-items: center; gap: 10px; margin: 12px 0 8px; border-radius: 18px; border: 1px solid var(--hair); background: var(--card-2); padding: 0 14px; min-height: 52px; }
+.dz-zip:focus-within { border-color: var(--dz-blue); box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+.dz-zip-ic { flex: none; width: 22px; height: 22px; color: var(--dz-blue); } .dz-zip-ic svg { width: 100%; height: 100%; }
+#duo-zip { flex: 1; min-width: 0; border: 0; background: transparent; box-shadow: none; padding: 0; min-height: 50px; font-size: 22px; letter-spacing: .08em; color: var(--text); outline: none; }
+.dz-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; font-size: 15px; }
+.dz-line-t { display: inline-flex; align-items: center; gap: 10px; color: var(--text); } .dz-line-t svg { width: 20px; height: 20px; color: var(--muted); flex: none; }
+.dz-step { display: inline-flex; border-radius: 14px; background: var(--card-2); overflow: hidden; }
+.dz-step button { width: 52px; min-height: 44px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 24px; line-height: 1; cursor: pointer; }
+.dz-step button + button { border-left: 1px solid var(--hair); } .dz-step button[disabled] { opacity: .35; }
+.dz-switch { flex: none; width: 56px; height: 34px; border-radius: 17px; border: 0; background: rgba(118,118,128,.4); position: relative; cursor: pointer; padding: 0; transition: background .2s; }
+.dz-switch i { position: absolute; top: 3px; left: 3px; width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.35); transition: transform .2s; }
+.dz-switch.on { background: var(--amber); } .dz-switch.on i { transform: translateX(22px); }
+/* the switch's tap area is 56x34 visually; stretch it to 44px tall without growing the look */
+.dz-switch::after { content: ''; position: absolute; inset: -6px -4px; }
+.dz-srow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--hair); }
+.dz-srow:last-of-type { border-bottom: 0; }
+.dz-srow .grow { min-width: 0; }
+.dz-sn { display: block; font-size: 17px; font-weight: 700; color: var(--text); text-decoration: none; line-height: 1.2; }
+.dz-srow small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.dz-srow.off { opacity: .5; }
+.dz-srow.hit .dz-sn { color: var(--live); }
+.dz-hits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dz-hit { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(var(--live-rgb), .16); color: var(--live); font-size: 13px; font-weight: 700; text-decoration: none; border: 1px solid rgba(var(--live-rgb), .5); }
+.dz-x { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; color: var(--faint); font-size: 28px; line-height: 1; cursor: pointer; }
+.dz-x:active { background: var(--card-2); }
+.dz-bad { color: var(--amber) !important; }
+.dz-det { margin: 0 0 10px; } .dz-det > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--muted); font-size: 14px; font-weight: 600; list-style: none; }
+.dz-det > summary::before { content: '›'; display: inline-block; margin-right: 8px; transition: transform .15s; font-size: 18px; } .dz-det[open] > summary::before { transform: rotate(90deg); }
+.dz-det > summary::-webkit-details-marker { display: none; }
+/* Sticky blue Check now: sits just above the tab bar; the content gets bottom padding so nothing hides behind it. */
+.dz-cta { position: sticky; bottom: calc(82px + env(safe-area-inset-bottom)); z-index: 40; display: grid; gap: 8px; margin: 12px 0 0; padding-top: 6px; pointer-events: none; }
+.dz-cta > * { pointer-events: auto; }
+.btn.buy.dz-big, .dz-big { min-height: 56px; border-radius: 28px; font-size: 18px; width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--dz-blue), var(--dz-blue-2)); color: #fff; box-shadow: 0 10px 28px rgba(37,99,235,.45); flex: none; }
+.dz-test { width: 100%; min-height: 44px; margin-top: 10px; border-radius: 22px; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border: 1px dashed var(--hair); }
+#tab-duo, #tab-ps5 { padding-bottom: 12px; }
+/* PS5 Pro */
+.ps-main { border-radius: 20px; padding: 18px; }
+.ps-state { display: flex; align-items: center; gap: 10px; margin: 2px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.ps-state.sm { font-size: 19px; }
+.ps-main.in .dz-dot, .ps-state.in .dz-dot { background: var(--live); } .ps-main.out .dz-dot, .ps-state.out .dz-dot { background: var(--muted); box-shadow: none; }
+.ps-main.over .dz-dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(224,176,90,.2); } .ps-main.in .ps-state { color: var(--live); } .ps-main.over .ps-state { color: var(--amber); }
+.ps-price { margin: 6px 0 4px; font-size: 40px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; } .ps-price small { font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 8px; }
+.ps-main .dz-big { margin-top: 14px; }
+.ps-when-t { margin: 0; font-size: 20px; font-weight: 800; } .ps-when-t.warn { color: var(--amber); }
+.ps-capf { display: flex; align-items: flex-end; gap: 10px; } .ps-capf .btn.buy { flex: none; min-width: 112px; }
+.ps-hist { list-style: none; margin: 0; padding: 0; } .ps-hist li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 0.5px solid var(--hair); font-size: 13px; }
+.ps-hist .when { color: var(--muted); font-weight: 600; } .ps-hist .txt { overflow-wrap: anywhere; } .ps-hist small { color: var(--faint); }
+@media (max-width: 380px) { .dz-chip.sz b { font-size: 15px; } .dz-carrier button { font-size: 12.5px; } .ps-hist li { grid-template-columns: 92px minmax(0, 1fr); } .ps-price { font-size: 36px; } }
+/* Muted alert pill + the big Buy now link on Duo/PS5 alert cards */
+.btn.buy.buynow, .btn.buynow { min-height: 52px; font-size: 17px; border-radius: 26px; background: linear-gradient(180deg, var(--dz-blue, #3b82f6), var(--dz-blue-2, #2563eb)); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
