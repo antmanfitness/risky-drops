@@ -1907,8 +1907,8 @@
     const when = r.checked_ts ? `${duo.saved ? 'Last checked' : 'Checked'} ${esc(etTime.format(new Date(r.checked_ts * 1000)))} ET${r.cached && !duo.saved ? ' (cached)' : ''}` : '';
     const quote = !r.pickup_error && !avail && all.some((s) => s.quote) ? ` Apple says: “${esc((all.find((s) => s.quote) || {}).quote)}”.` : '';
     const sum = r.pickup_error ? '' : `<p class="dz-sum ${avail ? 'hot' : ''}">${avail ? `<b>${avail} store${avail === 1 ? '' : 's'} with your Duo for pickup</b>` : 'None of your selected models are in stock for pickup right now.'} <span class="dz-when">${when}.${quote}</span></p>`;
-    out.innerHTML = `${sum}<details class="dz-det" ${avail ? 'open' : ''}><summary>Full stock table (${all.length} stores + online)</summary>${duoTable(r, sel)}
-      <p class="hint" style="margin:8px 2px 0">Your colors and sizes are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys.</p></details>`;
+    out.innerHTML = `${sum}<p class="dz-k" style="margin:10px 2px 6px">Stock by store · every color and size</p>${duoTable(r, sel)}
+      <p class="hint" style="margin:8px 2px 0">Scroll sideways for all sizes. Your colors and sizes are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys.</p>`;
   }
   const duoRender = () => { duoRenderStatus(); duoRenderWant(); duoRenderStores(); duoRenderOut(); };
   async function duoRun(force) {
