@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var t=localStorage.getItem('rd-theme')||'dark';var d=t==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=d;})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024203057">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024203057">
-<link rel="stylesheet" href="./css/app.css?v=20261024203057">
-<link rel="stylesheet" href="./css/fold.css?v=20261024203057">
+<link rel="stylesheet" href="./css/tokens.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024223712">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024223712">
+<link rel="stylesheet" href="./css/app.css?v=20261024223712">
+<link rel="stylesheet" href="./css/fold.css?v=20261024223712">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -116,8 +116,9 @@
     <div id="dash-cards"></div>
   </section>
   <section class="screen" id="tab-duo" hidden>
-    <h2 class="section">Duo Stock</h2>
+    <div class="dz-titlebar"><h2 class="section">Duo Stock</h2><button type="button" class="btn buy dz-go-top" id="duo-go">Check now</button></div>
     <div class="card dz-status" id="duo-status" role="status" aria-live="polite"></div>
+    <div id="duo-out"></div>
     <div class="dz-cols">
     <div class="card dz-want" id="duo-want">
       <p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>What I want</p>
@@ -136,10 +137,8 @@
       <p class="msg" id="duo-msg" role="status"></p>
       <button type="button" class="btn dz-test" id="duo-test">Send a TEST ping to my phone</button>
     </div>
-    <div id="duo-out"></div>
     <div class="card dz-stores" id="duo-stores"></div>
     </div>
-    <div class="dz-cta"><button type="button" class="btn buy dz-big" id="duo-go">Check now</button></div>
   </section>
   <section class="screen" id="tab-ps5" hidden>
     <h2 class="section">PS5 Pro</h2>
@@ -615,10 +614,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261024203057"></script>
-<script src="./js/orbit.js?v=20261024203057"></script>
-<script src="./js/classify.js?v=20261024203057"></script>
-<script src="./js/scanner.js?v=20261024203057"></script>
-<script src="./js/app.js?v=20261024203057"></script>
+<script src="./js/config.js?v=20261024223712"></script>
+<script src="./js/orbit.js?v=20261024223712"></script>
+<script src="./js/classify.js?v=20261024223712"></script>
+<script src="./js/scanner.js?v=20261024223712"></script>
+<script src="./js/app.js?v=20261024223712"></script>
 </body>
 </html>

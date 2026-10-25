@@ -2039,3 +2039,6 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
   } else bootOther();
 })();
+
+// keep the sticky Duo title bar right under the header
+(function () { const hd = document.querySelector('.app-header'); const set = () => { if (hd) document.documentElement.style.setProperty('--hdr-h', Math.round(hd.getBoundingClientRect().height) + 'px'); }; set(); addEventListener('resize', set); setTimeout(set, 600); })();

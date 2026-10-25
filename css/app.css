@@ -597,3 +597,9 @@ td.emph .dz { font-size: 11.5px; }
 @media (max-width: 380px) { .dz-chip.sz b { font-size: 15px; } .dz-carrier button { font-size: 12.5px; } .ps-hist li { grid-template-columns: 92px minmax(0, 1fr); } .ps-price { font-size: 36px; } }
 /* Muted alert pill + the big Buy now link on Duo/PS5 alert cards */
 .btn.buy.buynow, .btn.buynow { min-height: 52px; font-size: 17px; border-radius: 26px; background: linear-gradient(180deg, var(--dz-blue, #3b82f6), var(--dz-blue-2, #2563eb)); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Duo: Check now sits in the top corner, sticky under the header, so it never covers the stock chart. */
+.dz-titlebar { position: sticky; top: var(--hdr-h, 64px); z-index: 45; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; margin: 0 0 6px; background: linear-gradient(180deg, var(--bg, #0b0f14) 70%, transparent); }
+.dz-titlebar h2.section { margin: 4px 4px 4px; }
+.btn.buy.dz-go-top { min-height: 44px; min-width: 44px; padding: 0 20px; width: auto; flex: none; border-radius: 22px; font-size: 16px; font-weight: 700; background: linear-gradient(180deg, var(--dz-blue), var(--dz-blue-2)); color: #fff; box-shadow: 0 6px 18px rgba(37,99,235,.4); }
+.btn.buy.dz-go-top:disabled { opacity: .7; }
