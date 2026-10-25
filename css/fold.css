@@ -153,10 +153,12 @@ h2.section { font-size: 26px; margin-top: 6px; }
   .sheet { width: min(640px, calc(100vw - 2 * var(--fold-pad-l))); }
   #tab-sales > .sd { }
 
-  /* v7 tab bar: seven tabs fit, no scrolling needed. */
+  /* v7 tab bar: eight tabs (incl. Pickup) fit, no scrolling needed. */
   .tabbar { overflow-x: hidden; } .tabbar button { flex: 1 1 0; }
   /* v7 Duo Stock: status full width, then "what I want" and the stores side by side; Check now is a centred pill. */
-  #tab-duo, #tab-ps5 { max-width: 1100px; }
+  #tab-duo, #tab-ps5, #tab-people { max-width: 1100px; }
+  .pp-cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 0 16px; align-items: start; }
+  #tab-duo > .ab-row { margin-bottom: 12px; }
   .dz-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 16px; align-items: start; }
   .dz-cols > .card { min-width: 0; }
   .dz-cols > #duo-out { grid-column: 1 / -1; order: 3; min-width: 0; }

@@ -117,9 +117,10 @@
     document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'tab-' + tab));
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     $('#gear').classList.toggle('on', tab === 'settings');
-    $('#ask-open').hidden = tab === 'ask' || tab === 'duo' || tab === 'ps5';   // the sticky Check now button lives where the orb floats
+    $('#ask-open').hidden = tab === 'ask' || tab === 'duo' || tab === 'ps5' || tab === 'people';   // the sticky Check now button lives where the orb floats
     if (tab === 'duo' && typeof duoOpen === 'function') duoOpen();
     if (tab === 'ps5' && typeof ps5Open === 'function') ps5Open();
+    if ((tab === 'people' || tab === 'duo') && typeof ppOpen === 'function') ppOpen(tab);
     const tb = document.querySelector(`.tabbar button[data-tab="${tab}"]`); if (tb && tb.scrollIntoView) tb.scrollIntoView({ inline: 'center', block: 'nearest' });
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (tab === 'phones' ? 'items' : tab) + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
@@ -2026,12 +2027,104 @@
     });
   }
 
+
+  // ---------- Pickup people + auto-buy policy row (Oct 24 2026). People live in Supabase (rd.pickup_people, key-checked rd_person_* RPCs).
+  // The policy row is READ-ONLY: it shows the sanitized mirror of the box's local policy file. Nothing in the app can switch auto-buy on.
+  const pp = { list: [], loaded: false, busy: false, edit: null, policy: null, open: false };
+  const abFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const abUntil = (iso) => { const d = new Date(iso); return isNaN(d) ? '?' : abFmt.format(d) + ' ET'; };
+  function abRender() {
+    const p = pp.policy, has = !!(p && p.models), on = has && p.enabled === true;
+    const sub = !has ? 'Waiting for the box to report its policy. The default is OFF.'
+      : on ? 'ON in the box file, but the checkout driver isn’t built yet, so it only alerts.'
+      : 'Alerts only. Nothing is bought automatically, and it can’t be switched on from this app.';
+    let det = '';
+    if (has) {
+      const m = p.models || {}, st = p.states || {};
+      const mrow = (z) => { const r = m[z]; if (!r) return ''; return r.rule === 'always' ? `${z}: always` : r.rule === 'never' ? `${z}: never auto-buy (alert only, waits for you)` : `${z}: until ${abUntil(r.until)} (${r.open_now ? 'open' : 'closed'})`; };
+      const rows = [`<b>Models</b> ${['256GB', '512GB', '1TB', '2TB'].map(mrow).filter(Boolean).map(esc).join(' · ')}`,
+        `<b>Where</b> ${esc((st.auto_buy || []).join(', ') || '—')} stores only (${esc((st.ignored || []).join(', '))} ignored; ${esc((st.excluded || []).join(', '))} excluded)`,
+        `<b>How</b> store pickup only, earliest slot, guest checkout`, `<b>Payment</b> Vault card, entered at buy time (never stored)`,
+        `<b>Limits</b> stops when Apple shows a limit${p.limit_stop ? '. <span class="ab-warn">LIMIT HIT: waiting for you</span>' : ''}`,
+        `<b>Synced</b> ${p.mirrored_at ? esc(dago(Math.round(new Date(p.mirrored_at).getTime() / 1000))) : '—'}`];
+      det = `<ul class="ab-det" ${pp.open ? '' : 'hidden'}>${rows.map((r) => `<li>${r}</li>`).join('')}</ul>`;
+    }
+    document.querySelectorAll('[data-ab]').forEach((el) => {
+      el.className = 'card ab-row ' + (on ? 'on' : 'off'); el.setAttribute('aria-expanded', String(pp.open));
+      el.innerHTML = `<div class="ab-top"><svg class="ab-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <span class="grow"><b>Auto-buy: ${on ? 'ON' : 'OFF'}</b><small>${esc(sub)}</small></span><span class="ab-pill">${on ? 'ON' : 'OFF'}</span><span class="ab-chev" aria-hidden="true">${pp.open ? '⌃' : '⌄'}</span></div>${det}`;
+    });
+  }
+  function ppRender() {
+    const el = $('#pp-list'); if (!el) return;
+    if (!pp.loaded) { el.innerHTML = '<p class="hint">Loading…</p>'; return; }
+    if (!pp.list.length) { el.innerHTML = '<p class="empty pp-empty">No pickup people yet.<br>Tap <b>+ Add person</b> at the top.</p>'; return; }
+    const n = pp.list.filter((x) => x.enabled).length;
+    el.innerHTML = pp.list.map((x) => `<div class="pp-row ${x.enabled ? '' : 'off'}">
+      <button type="button" class="pp-main" data-edit="${x.id}" aria-label="Edit ${esc(x.name)}"><b>${esc(x.name)}${x.is_default ? ' <span class="pp-def">Default</span>' : ''}</b>
+        <small>${[x.phone, x.email].filter(Boolean).map(esc).join(' · ') || 'No phone or email yet'}</small>${x.note ? `<small class="pp-nt">${esc(x.note)}</small>` : ''}</button>
+      <span class="pp-act">
+        <button type="button" class="dz-switch pp-sw ${x.enabled ? 'on' : ''}" role="switch" aria-checked="${x.enabled}" data-tog="${x.id}" aria-label="${esc(x.name)} on or off"><i></i></button>
+        <button type="button" class="pp-ic ${x.is_default ? 'on' : ''}" data-def="${x.id}" aria-label="Make ${esc(x.name)} the default" aria-pressed="${x.is_default}" title="Default"><svg viewBox="0 0 24 24" fill="${x.is_default ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></svg></button>
+        <button type="button" class="pp-ic del" data-del="${x.id}" aria-label="Delete ${esc(x.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+      </span></div>`).join('') + `<p class="hint pp-count">${n} of ${pp.list.length} on. ${n ? '' : 'Auto-buy would only alert until someone is on.'}</p>`;
+  }
+  async function ppLoad() {
+    if (!CFG || !KEY) return; const m = $('#pp-msg');
+    try { pp.list = (await rpc('rd_people', { p_key: KEY })) || []; pp.loaded = true; m.textContent = ''; } catch (e) { m.className = 'msg err'; m.textContent = 'Couldn’t load people: ' + e.message; }
+    ppRender();
+  }
+  async function abLoad() {
+    if (!CFG || !KEY) return;
+    try { pp.policy = await rpc('rd_autobuy_get', { p_key: KEY }); } catch (e) { /* keep the last one */ }
+    abRender();
+  }
+  function ppOpen(tab) { abRender(); abLoad(); if (tab === 'people') { ppRender(); ppLoad(); } }
+  function ppSheet(person) {
+    pp.edit = person || null; const f = $('#person-form'); f.reset(); $('#pp-form-msg').textContent = ''; $('#pp-form-msg').className = 'msg';
+    $('#pp-title').textContent = person ? 'Edit pickup person' : 'Add pickup person';
+    if (person) { f.name.value = person.name; f.phone.value = person.phone || ''; f.email.value = person.email || ''; f.note.value = person.note || ''; f.is_default.checked = !!person.is_default; f.enabled.checked = !!person.enabled; }
+    else { f.enabled.checked = true; f.is_default.checked = !pp.list.some((x) => x.enabled); }   // the first person you add becomes the default
+    sheet('#sheet-person'); setTimeout(() => { try { f.name.focus(); } catch (e) { /* ignore */ } }, 120);
+  }
+  if (CFG) {
+    $('#pp-add').addEventListener('click', () => ppSheet(null));
+    $('#person-form').addEventListener('submit', async (e) => {
+      e.preventDefault(); const f = e.target, m = $('#pp-form-msg'), name = f.name.value.trim(), phone = f.phone.value.trim(), email = f.email.value.trim();
+      const bad = !name ? 'Enter the person’s name.' : (phone && !/^[0-9 ()+.-]{7,30}$/.test(phone)) ? 'Phone: digits only, like 732 555 0100.' : (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) ? 'That email doesn’t look right.' : '';
+      if (bad) { m.className = 'msg err'; m.textContent = bad; return; }
+      m.className = 'msg'; m.textContent = 'Saving…'; $('#pp-save').disabled = true;
+      try {
+        await rpc('rd_person_save', { p_key: KEY, p_id: pp.edit ? pp.edit.id : null, p_person: { name, phone, email, note: f.note.value.trim(), enabled: f.enabled.checked || f.is_default.checked, is_default: f.is_default.checked } });
+        closeSheet(); toast(pp.edit ? 'Saved' : 'Added ' + name); await ppLoad();
+      } catch (err) { m.className = 'msg err'; m.textContent = err.message; }
+      $('#pp-save').disabled = false;
+    });
+    $('#pp-list').addEventListener('click', async (e) => {
+      const b = e.target.closest('button'); if (!b || pp.busy) return;
+      const id = +(b.dataset.edit || b.dataset.tog || b.dataset.def || b.dataset.del), x = pp.list.find((y) => y.id === id); if (!x) return;
+      if (b.dataset.edit) { ppSheet(x); return; }
+      pp.busy = true;
+      try {
+        if (b.dataset.tog) await rpc('rd_person_toggle', { p_key: KEY, p_id: id, p_enabled: !x.enabled });
+        else if (b.dataset.def) await rpc('rd_person_default', { p_key: KEY, p_id: id });
+        else if (b.dataset.del && await confirmBox({ title: `Delete ${x.name}?`, body: 'They’ll be removed from the pickup list.', ok: 'Delete', danger: true })) { await rpc('rd_person_delete', { p_key: KEY, p_id: id }); toast('Deleted'); }
+        await ppLoad();
+      } catch (err) { toast(err.message); }
+      pp.busy = false;
+    });
+    document.querySelectorAll('[data-ab]').forEach((el) => {
+      const tog = () => { pp.open = !pp.open; abRender(); };
+      el.addEventListener('click', tog); el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tog(); } });
+    });
+  } else { document.querySelectorAll('.tabbar [data-tab="people"]').forEach((b) => (b.hidden = true)); document.querySelectorAll('[data-ab]').forEach((b) => (b.hidden = true)); }
+
   const route = () => { const [h, hs, h3] = location.hash.slice(1).split('/');
     if (h === 'watches' && hs === 'w' && h3) { state.wdetail = decodeURIComponent(h3); show('watches', 'list'); history.replaceState(null, '', location.pathname + location.search + '#watches/w/' + h3); renderWatches(); return; }
     if (state.wdetail) { state.wdetail = null; if (state.status) renderWatches(); }
     if (h === 'watches' && hs === 'duo') { show('duo'); return; }
     if (h === 'friends') { frDetail = hs && /^\d+$/.test(hs) ? +hs : null; show('friends', hs || null); return; }
-    if (['home', 'duo', 'ps5', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
+    if (['home', 'duo', 'ps5', 'people', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
   if (MODE === 'admin') {
     route(); window.addEventListener('hashchange', route);
     load();
