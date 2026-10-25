@@ -62,11 +62,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
 /* floating glass bottom tab bar */
 .tabbar { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom));
-  width: min(440px, calc(100vw - 24px)); display: flex; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; overscroll-behavior-x: contain; padding: 6px; border-radius: 26px;
+  width: min(440px, calc(100vw - 24px)); display: flex; overflow-x: hidden; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; padding: 6px; border-radius: 26px;
   background: var(--glass); border: 0.5px solid var(--hair); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
   box-shadow: 0 10px 30px rgba(0,0,0,.35); max-width: calc(100vw - 24px); }
 .tabbar::-webkit-scrollbar { display: none; }
-.tabbar button { flex: 0 0 18%; scroll-snap-align: center; min-width: 0; min-height: 52px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; border-radius: 20px;
+.tabbar button { flex: 1 1 0; scroll-snap-align: center; min-width: 0; min-height: 52px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; border-radius: 20px;
   display: grid; place-items: center; gap: 2px; cursor: pointer; position: relative; padding: 4px 0; }
 .tabbar button svg { width: 24px; height: 24px; }
 .tabbar button.on { color: var(--accent); background: rgba(var(--accent-rgb), .14); }
@@ -466,13 +466,6 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 #su-chips { margin: -2px 0 8px; }
 
 /* ---------- Duo Stock (Watches → Duo) ---------- */
-.duo-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer; border: 0.5px solid var(--line); background: linear-gradient(135deg, rgba(var(--accent-rgb), .16), var(--card) 70%); min-height: 64px; }
-.duo-card:active { transform: scale(.985); }
-.duo-card .t { display: block; font-size: 16px; font-weight: 800; }
-.duo-card .d { display: block; }
-.duo-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-dim); color: var(--accent-2); }
-.duo-ic svg { width: 22px; height: 22px; }
-.duo-go { font-size: 26px; color: var(--accent-2); line-height: 1; }
 .duo-row { display: flex; align-items: flex-end; gap: 10px; }
 .duo-row .field { margin-top: 10px; }
 .duo-row .btn.buy { flex: none; min-width: 120px; }
@@ -521,8 +514,6 @@ td.emph .dz { font-size: 11.5px; }
 #w-seg button { flex: 1 0 auto; padding: 0 5px; font-size: 13px; white-space: nowrap; }
 
 /* ---- v7: Duo Stock + PS5 Pro tabs (Oct 24 2026). Reference layout: status card, WHAT I WANT, nearest stores, sticky blue Check now. ---- */
-#tab-duo, #tab-ps5, #tab-people { --dz-blue: #3b82f6; --dz-blue-2: #2563eb; --dz-chip: rgba(59,130,246,.9); }
-[data-theme="light"] #tab-duo, [data-theme="light"] #tab-ps5, [data-theme="light"] #tab-people { --dz-blue: #2563eb; --dz-blue-2: #1d4ed8; --dz-chip: #2563eb; }
 .dz-k { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--muted); font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .dz-k svg { width: 17px; height: 17px; flex: none; }
 .dz-status { border-radius: 20px; padding: 16px 18px; }
@@ -538,7 +529,7 @@ td.emph .dz { font-size: 11.5px; }
 .dz-chips { display: grid; gap: 10px; margin-bottom: 10px; }
 .dz-chips.two { grid-template-columns: 1fr 1fr; } .dz-chips.four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .dz-chip { min-height: 48px; border-radius: 24px; border: 1px solid var(--hair); background: var(--card-2); color: var(--muted); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; }
-.dz-chip.on { background: var(--dz-chip); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(59,130,246,.28); }
+.dz-chip.on { background: var(--dz-chip); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(var(--accent-rgb), .28); }
 .dz-chip.sz { flex-direction: column; gap: 0; min-height: 56px; border-radius: 22px; }
 .dz-chip.sz b { font-size: 15px; white-space: nowrap; letter-spacing: -.2px; } .dz-chip.sz { padding: 0 2px; } .dz-chip.sz small { font-size: 11px; font-weight: 600; opacity: .85; }
 .dz-chip .sw { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(128,128,128,.7); }
@@ -548,7 +539,7 @@ td.emph .dz { font-size: 11.5px; }
 .dz-carrier button.on { background: var(--card-2); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 .dz-carrier button.nt { color: var(--muted); } .dz-carrier button small { font-size: 9.5px; font-weight: 600; color: var(--faint); line-height: 1.1; }
 .dz-zip { display: flex; align-items: center; gap: 10px; margin: 12px 0 8px; border-radius: 18px; border: 1px solid var(--hair); background: var(--card-2); padding: 0 14px; min-height: 52px; }
-.dz-zip:focus-within { border-color: var(--dz-blue); box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+.dz-zip:focus-within { border-color: var(--dz-blue); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .25); }
 .dz-zip-ic { flex: none; width: 22px; height: 22px; color: var(--dz-blue); } .dz-zip-ic svg { width: 100%; height: 100%; }
 #duo-zip { flex: 1; min-width: 0; border: 0; background: transparent; box-shadow: none; padding: 0; min-height: 50px; font-size: 22px; letter-spacing: .08em; color: var(--text); outline: none; }
 .dz-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; font-size: 15px; }
@@ -579,7 +570,7 @@ td.emph .dz { font-size: 11.5px; }
 /* Sticky blue Check now: sits just above the tab bar; the content gets bottom padding so nothing hides behind it. */
 .dz-cta { position: sticky; bottom: calc(82px + env(safe-area-inset-bottom)); z-index: 40; display: grid; gap: 8px; margin: 12px 0 0; padding-top: 6px; pointer-events: none; }
 .dz-cta > * { pointer-events: auto; }
-.btn.buy.dz-big, .dz-big { min-height: 56px; border-radius: 28px; font-size: 18px; width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--dz-blue), var(--dz-blue-2)); color: #fff; box-shadow: 0 10px 28px rgba(37,99,235,.45); flex: none; }
+.btn.buy.dz-big, .dz-big { min-height: 56px; border-radius: 28px; font-size: 18px; width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--dz-blue), var(--dz-blue-2)); color: #fff; box-shadow: 0 10px 28px rgba(var(--accent-rgb), .40); flex: none; }
 .dz-test { width: 100%; min-height: 44px; margin-top: 10px; border-radius: 22px; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border: 1px dashed var(--hair); }
 #tab-duo, #tab-ps5 { padding-bottom: 12px; }
 /* PS5 Pro */
@@ -601,7 +592,7 @@ td.emph .dz { font-size: 11.5px; }
 /* Duo: Check now sits in the top corner, sticky under the header, so it never covers the stock chart. */
 .dz-titlebar { position: sticky; top: var(--hdr-h, 64px); z-index: 45; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; margin: 0 0 6px; background: linear-gradient(180deg, var(--bg, #0b0f14) 70%, transparent); }
 .dz-titlebar h2.section { margin: 4px 4px 4px; }
-.btn.buy.dz-go-top { min-height: 44px; min-width: 44px; padding: 0 20px; width: auto; flex: none; border-radius: 22px; font-size: 16px; font-weight: 700; background: linear-gradient(180deg, var(--dz-blue), var(--dz-blue-2)); color: #fff; box-shadow: 0 6px 18px rgba(37,99,235,.4); }
+.btn.buy.dz-go-top { min-height: 44px; min-width: 44px; padding: 0 20px; width: auto; flex: none; border-radius: 22px; font-size: 16px; font-weight: 700; background: linear-gradient(180deg, var(--dz-blue), var(--dz-blue-2)); color: #fff; box-shadow: 0 6px 18px rgba(var(--accent-rgb), .4); }
 .btn.buy.dz-go-top:disabled { opacity: .7; }
 
 /* Auto-buy policy status row (read-only) + Pickup people tab. */
@@ -633,3 +624,35 @@ td.emph .dz { font-size: 11.5px; }
 .pp-empty { text-align: center; padding: 22px 8px; } .pp-count { margin: 6px 2px 8px; }
 @media (max-width: 400px) { .pp-row { grid-template-columns: minmax(0, 1fr); } .pp-act { justify-content: space-between; } }
 .pp-main:focus-visible, .ab-row:focus-visible { outline: 2px solid var(--dz-blue, #3b82f6); outline-offset: 2px; border-radius: 12px; }
+
+/* ---- v8: More menu, theme picker, Settings columns ---- */
+.kicker { color: var(--muted); }
+.more-list { padding: 4px; margin-bottom: 4px; }
+.more-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 10px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; border-radius: 14px; cursor: pointer; }
+.more-row + .more-row { border-top: 1px solid var(--hair); border-radius: 0 0 14px 14px; }
+.more-row:active { background: rgba(var(--accent-rgb), .10); }
+.more-row:focus-visible, .th-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.more-ic { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--accent); background: rgba(var(--accent-rgb), .14); }
+.more-ic svg { width: 22px; height: 22px; }
+.more-tx { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.more-tx b { font-size: 16px; font-weight: 700; }
+.more-tx small { color: var(--muted); font-size: 13px; line-height: 1.3; }
+.more-n { flex: none; min-width: 24px; height: 24px; padding: 0 8px; border-radius: 12px; background: rgba(var(--accent-rgb), .18); color: var(--accent-2); font-size: 13px; font-weight: 800; line-height: 24px; text-align: center; }
+.more-n:empty { display: none; }
+.more-chev { flex: none; color: var(--muted); font-size: 24px; line-height: 1; }
+.th-card { padding: 14px; }
+.th-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.th-tile { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 12px; text-align: left; font: inherit; color: var(--text); background: var(--card-2); border: 1.5px solid var(--hair); border-radius: 16px; cursor: pointer; }
+.th-tile.on { border-color: var(--accent); background: rgba(var(--accent-rgb), .12); }
+.th-prev { flex: none; position: relative; width: 64px; height: 44px; border-radius: 10px; border: 1px solid rgba(128,128,128,.35); overflow: hidden; display: block; }
+.th-prev i { position: absolute; display: block; border-radius: 4px; }
+.th-prev i:nth-child(1) { left: 6px; right: 6px; top: 6px; height: 16px; }
+.th-prev i:nth-child(2) { left: 6px; width: 26px; bottom: 6px; height: 12px; }
+.th-prev i:nth-child(3) { right: 6px; width: 20px; bottom: 6px; height: 12px; }
+.th-tx { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.th-tx b { font-size: 15.5px; font-weight: 700; }
+.th-tx small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+.th-ok { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 800; color: transparent; border: 1.5px solid var(--hair); }
+.th-tile.on .th-ok { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
+.set-cols, .more-cols { display: block; }
+.set-col, .more-col { min-width: 0; }

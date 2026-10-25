@@ -109,13 +109,15 @@
   }
 
   // ---------- tabs
-  // Tabs: Home / Watches (list | alerts | countdowns) / Phones / Sales (listings | sold | comps). Settings = header gear, Ask = floating orb.
+  // Dock: Home / Duo / PS5 Pro / Watches / Pickup / More. More holds Items, Sales, Favorites, Friends, Ask and Settings (admin link only) plus the theme picker.
+  // Items, Sales, Friends, Settings and Ask keep their own screens; the dock highlights More while you are on one of them.
+  const MORE_SET = ['more', 'phones', 'sales', 'friends', 'settings', 'ask'];
   const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
   function show(tab, sub) {
     if (LEGACY[tab]) [tab, sub] = LEGACY[tab];
     state.tab = tab;
     document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'tab-' + tab));
-    document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    document.querySelectorAll('.tabbar button').forEach((b) => { const on = b.dataset.tab === tab || (b.dataset.tab === 'more' && MORE_SET.includes(tab)); b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('#gear').classList.toggle('on', tab === 'settings');
     $('#ask-open').hidden = tab === 'ask' || tab === 'duo' || tab === 'ps5' || tab === 'people';   // the sticky Check now button lives where the orb floats
     if (tab === 'duo' && typeof duoOpen === 'function') duoOpen();
@@ -134,6 +136,8 @@
   }
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
   $('#gear').addEventListener('click', () => show('settings'));
+  // More menu: every row opens its screen; Favorites lives inside Watches.
+  document.querySelectorAll('.more-row').forEach((b) => b.addEventListener('click', () => { const g = b.dataset.go; if (g === 'favs') show('watches', 'favs'); else show(g); if (g === 'ask') loadAsk().catch(() => {}); }));
   const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
   function showSub(g, v) {
     if (!SUBS[g].includes(v)) return; state[g + 'sub'] = v;
@@ -467,7 +471,7 @@
   function renderFavs() {
     if (!$('#fav-list')) return;
     const list = favs.filter((f) => !f.promoted_at || f.promote_state === 'pending' || f.promote_state === 'failed');
-    $('#fav-count').textContent = list.length ? String(list.length) : '';
+    $('#fav-count').textContent = list.length ? String(list.length) : ''; { const mf = $('#more-fav-n'); if (mf) mf.textContent = list.length ? String(list.length) : ''; }
     $('#fav-list').innerHTML = list.map((f) => {
       const pend = f.promoted_at && f.promote_state === 'pending', watched = !pend && f.url && (state.status?.items || []).some((i) => i.link === f.url);
       const failed = !watched && f.promoted_at && f.promote_state === 'failed';
@@ -577,16 +581,17 @@
   $('#fee').addEventListener('input', renderFlip);
 
   // ---------- settings
-  function applyTheme(t) {
-    localStorage.setItem('rd-theme', t);
-    const d = t === 'auto' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
-    document.documentElement.dataset.theme = d;
-    document.querySelector('meta[name=theme-color]').content = d === 'light' ? '#f6f1e8' : '#030404';
-    document.querySelectorAll('#theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
+  // Themes: six looks, saved per device. The same ids live in tokens.css and the <head> script in index.html.
+  const THEMES = { navy: '#070d1a', graphite: '#0b0e0d', purple: '#0c0717', ember: '#080605', light: '#f2f5fa', classic: '#030404' };
+  function applyTheme(t, save = true) {
+    if (!THEMES[t]) t = 'navy';
+    if (save) { try { localStorage.setItem('rd-theme2', t); } catch (e) { /* private mode: theme just won't persist */ } }
+    document.documentElement.dataset.theme = t;
+    document.querySelector('meta[name=theme-color]').content = THEMES[t];
+    document.querySelectorAll('#theme-grid [data-theme-pick]').forEach((b) => { const on = b.dataset.themePick === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
   }
-  $('#theme-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) applyTheme(b.dataset.t); });
-  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (localStorage.getItem('rd-theme') === 'auto') applyTheme('auto'); });
-  applyTheme(localStorage.getItem('rd-theme') || 'dark');
+  $('#theme-grid').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-pick]'); if (b) applyTheme(b.dataset.themePick); });
+  { let cur = 'navy'; try { cur = localStorage.getItem('rd-theme2') || 'navy'; } catch (e) { /* ignore */ } applyTheme(cur, false); }
   $('#test-btn').addEventListener('click', async (e) => {
     const b = e.currentTarget, m = $('#test-msg'); b.disabled = true; m.className = 'msg'; m.textContent = 'Sending…';
     try { await api('/api/test-notify', {}); m.className = 'msg ok'; m.textContent = 'Sent. Check the ntfy app on your iPhone.'; load(); }
@@ -1976,8 +1981,7 @@
       const m = $('#duo-msg'); m.className = 'msg'; m.textContent = 'Sending the test ping…';
       try { await quick('test_notify', { which: 'duo' }, 60000); m.textContent = 'TEST ping sent. Check your phone.'; } catch (e) { m.className = 'msg err'; m.textContent = e.message; }
     });
-    $('#duo-card').addEventListener('click', () => show('duo'));
-  } else { $('#duo-card').hidden = true; document.querySelectorAll('.tabbar [data-tab="duo"], .tabbar [data-tab="ps5"]').forEach((b) => (b.hidden = true)); }
+  } else { document.querySelectorAll('.tabbar [data-tab="duo"], .tabbar [data-tab="ps5"]').forEach((b) => (b.hidden = true)); }
 
   // ---------- PS5 Pro tab: Walmart item 18235967161 (New only pings; open box is shown separately). Real data from the box's wm_state.json / wm.log.
   const ps5 = { d: null, busy: false, opened: false };
@@ -2124,7 +2128,7 @@
     if (state.wdetail) { state.wdetail = null; if (state.status) renderWatches(); }
     if (h === 'watches' && hs === 'duo') { show('duo'); return; }
     if (h === 'friends') { frDetail = hs && /^\d+$/.test(hs) ? +hs : null; show('friends', hs || null); return; }
-    if (['home', 'duo', 'ps5', 'people', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
+    if (['home', 'duo', 'ps5', 'people', 'more', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
   if (MODE === 'admin') {
     route(); window.addEventListener('hashchange', route);
     load();

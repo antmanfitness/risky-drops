@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" data-theme="dark" data-skin="glass">
+<html lang="en" data-theme="navy" data-skin="glass">
 <head>
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Risky Drops</title>
-<meta name="theme-color" content="#030404">
+<meta name="theme-color" content="#070d1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,21 +15,21 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
-<script>(function(){var t=localStorage.getItem('rd-theme')||'dark';var d=t==='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):t;document.documentElement.dataset.theme=d;})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024225549">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024225549">
-<link rel="stylesheet" href="./css/app.css?v=20261024225549">
-<link rel="stylesheet" href="./css/fold.css?v=20261024225549">
+<script>(function(){var T={navy:'#070d1a',graphite:'#0b0e0d',purple:'#0c0717',ember:'#080605',light:'#f2f5fa',classic:'#030404'},t='navy';try{t=localStorage.getItem('rd-theme2')||'navy'}catch(e){}if(!T[t])t='navy';document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name=theme-color]');if(m)m.content=T[t];})();</script>
+<link rel="stylesheet" href="./css/tokens.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024230656">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024230656">
+<link rel="stylesheet" href="./css/app.css?v=20261024230656">
+<link rel="stylesheet" href="./css/fold.css?v=20261024230656">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
-<svg width="0" height="0" style="position:absolute"><defs><g id="logo"><circle cx="50" cy="50" r="44" fill="none" stroke="#22c55e" stroke-width="4"/><path d="M50 14 C50 14 26 44 26 60 a24 24 0 0 0 48 0 C74 44 50 14 50 14Z" fill="#fff"/><path d="M53 40 L41 61 H49 L46 76 L60 54 H52 Z" fill="#ff4338"/></g></defs></svg>
+<svg width="0" height="0" style="position:absolute"><defs><g id="logo"><circle cx="50" cy="50" r="44" fill="none" style="stroke:var(--accent)" stroke-width="4"/><path d="M50 14 C50 14 26 44 26 60 a24 24 0 0 0 48 0 C74 44 50 14 50 14Z" fill="#fff"/><path d="M53 40 L41 61 H49 L46 76 L60 54 H52 Z" fill="#ff4338"/></g></defs></svg>
 <header class="app-header">
   <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg>
   <h1>Risky Drops</h1>
@@ -118,8 +118,8 @@
   <section class="screen" id="tab-duo" hidden>
     <div class="dz-titlebar"><h2 class="section">Duo Stock</h2><button type="button" class="btn buy dz-go-top" id="duo-go">Check now</button></div>
     <div class="card dz-status" id="duo-status" role="status" aria-live="polite"></div>
-    <div class="card ab-row" data-ab role="button" tabindex="0" aria-expanded="false" aria-label="Auto-buy policy status"></div>
     <div id="duo-out"></div>
+    <div class="card ab-row" data-ab role="button" tabindex="0" aria-expanded="false" aria-label="Auto-buy policy status"></div>
     <div class="dz-cols">
     <div class="card dz-want" id="duo-want">
       <p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>What I want</p>
@@ -184,11 +184,6 @@
       <div id="wdetail-body"></div>
     </div>
     <div id="w-main">
-    <button type="button" class="card duo-card" id="duo-card" aria-label="Open Duo Stock">
-      <span class="duo-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg></span>
-      <span class="grow"><b class="t">Duo Stock</b><span class="d">Type a ZIP, see live iPhone Duo pickup stock at nearby Apple Stores.</span></span>
-      <span class="duo-go" aria-hidden="true">›</span>
-    </button>
     <div id="w-dash"></div>
     <div class="card summary" id="summary"></div>
     <div id="watch-list"></div>
@@ -287,13 +282,79 @@
 
     </div>
   </section>
+  <section class="screen" id="tab-more" hidden>
+    <h2 class="section">More</h2>
+    <div class="more-cols">
+      <div class="more-col">
+        <p class="kicker">Inventory &amp; sales</p>
+        <div class="card more-list">
+        <button type="button" class="more-row" data-go="phones"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z M3 8l9 5 9-5M12 13v8"/></svg></span><span class="more-tx"><b>Items</b><small>Phones, consoles and collector payouts</small></span><span class="more-chev" aria-hidden="true">›</span></button>
+        <button type="button" class="more-row" data-go="sales"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/></svg></span><span class="more-tx"><b>Sales</b><small>Listings, sold, profit and comps</small></span><span class="more-chev" aria-hidden="true">›</span></button>
+        <button type="button" class="more-row" data-go="favs"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8 6.8 19.6l1-5.8L3.5 9.7l5.9-.9z"/></svg></span><span class="more-tx"><b>Favorites</b><small>Saved items to watch later</small></span><span class="more-n" id="more-fav-n"></span><span class="more-chev" aria-hidden="true">›</span></button>
+        </div>
+        <p class="kicker">People</p>
+        <div class="card more-list">
+        <button type="button" class="more-row" data-go="friends"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></span><span class="more-tx"><b>Friends &amp; logins</b><small>Add friends and manage their access</small></span><span class="more-chev" aria-hidden="true">›</span></button>
+        </div>
+        <p class="kicker">Assistant &amp; app</p>
+        <div class="card more-list">
+        <button type="button" class="more-row" data-go="ask"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg></span><span class="more-tx"><b>Ask Risky</b><small>Ask for flip ideas and live price checks</small></span><span class="more-chev" aria-hidden="true">›</span></button>
+        <button type="button" class="more-row" data-go="settings"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span><span class="more-tx"><b>Settings</b><small>Account, reminders, push alerts and tools</small></span><span class="more-chev" aria-hidden="true">›</span></button>
+        </div>
+      </div>
+      <div class="more-col">
+        <p class="kicker">Appearance</p>
+        <div class="card th-card">
+          <p class="d" style="margin:0 0 10px">Pick a look. Saved on this device only.</p>
+          <div class="th-grid" id="theme-grid" role="radiogroup" aria-label="Theme">
+        <button type="button" class="th-tile" data-theme-pick="navy" role="radio" aria-checked="false"><span class="th-prev" style="background:#070d1a"><i style="background:#111b30"></i><i style="background:#5b9bff"></i><i style="background:#5b9bff;opacity:.45"></i></span><span class="th-tx"><b>Deep Navy</b><small>Electric blue on navy. The new default</small></span><span class="th-ok" aria-hidden="true">✓</span></button>
+        <button type="button" class="th-tile" data-theme-pick="graphite" role="radio" aria-checked="false"><span class="th-prev" style="background:#0b0e0d"><i style="background:#171c1a"></i><i style="background:#34d399"></i><i style="background:#34d399;opacity:.45"></i></span><span class="th-tx"><b>Graphite</b><small>Neutral dark with emerald</small></span><span class="th-ok" aria-hidden="true">✓</span></button>
+        <button type="button" class="th-tile" data-theme-pick="purple" role="radio" aria-checked="false"><span class="th-prev" style="background:#0c0717"><i style="background:#1a1030"></i><i style="background:#b197fc"></i><i style="background:#b197fc;opacity:.45"></i></span><span class="th-tx"><b>Midnight Purple</b><small>Deep violet with soft lilac</small></span><span class="th-ok" aria-hidden="true">✓</span></button>
+        <button type="button" class="th-tile" data-theme-pick="ember" role="radio" aria-checked="false"><span class="th-prev" style="background:#080605"><i style="background:#1a1511"></i><i style="background:#ff8a3d"></i><i style="background:#ff8a3d;opacity:.45"></i></span><span class="th-tx"><b>Ember</b><small>Black with warm orange</small></span><span class="th-ok" aria-hidden="true">✓</span></button>
+        <button type="button" class="th-tile" data-theme-pick="light" role="radio" aria-checked="false"><span class="th-prev" style="background:#f2f5fa"><i style="background:#ffffff"></i><i style="background:#1d4ed8"></i><i style="background:#1d4ed8;opacity:.45"></i></span><span class="th-tx"><b>Light</b><small>Bright, easy in daylight</small></span><span class="th-ok" aria-hidden="true">✓</span></button>
+        <button type="button" class="th-tile" data-theme-pick="classic" role="radio" aria-checked="false"><span class="th-prev" style="background:#030404"><i style="background:#17191e"></i><i style="background:#2fbf71"></i><i style="background:#2fbf71;opacity:.45"></i></span><span class="th-tx"><b>Classic</b><small>The original black and green</small></span><span class="th-ok" aria-hidden="true">✓</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
   <section class="screen" id="tab-settings" hidden>
     <h2 class="section">Settings</h2>
+    <div class="set-cols">
+    <div class="set-col">
+    <p class="kicker">Account</p>
     <div class="card" id="acct-card">
       <p class="t">Account</p>
       <p class="d" id="acct-who"></p>
       <div class="actions"><a class="btn" href="#friends">Friends &amp; logins</a><button class="btn" type="button" id="acct-logout">Log out</button></div>
     </div>
+    <p class="kicker">People &amp; notifications</p>
+    <div class="card" id="member-card">
+      <p class="t">Who's using this? (members &amp; collectors)</p>
+      <p class="d">Pick yourself so your countdowns and reminders are yours. Saved on this device only.</p>
+      <label class="field">Member<select id="member-pick"></select></label>
+      <p class="d" id="member-topic"></p>
+      <div class="actions"><button class="btn" id="member-edit" type="button">Edit me</button><button class="btn" id="member-add" type="button">+ Add member</button></div>
+      <form id="member-form" hidden autocomplete="off">
+        <label class="field">Name<input type="text" name="name" required maxlength="60" placeholder="e.g. Dev"></label>
+        <label class="field">ntfy topic (for reminders)<input type="text" name="topic" maxlength="64" autocapitalize="off" spellcheck="false" placeholder="e.g. rd-dev-7f3k2q"></label>
+        <p class="hint">Letters, numbers, - and _ only. Pick something hard to guess: anyone who knows a topic can read it. <button class="linkbtn" type="button" id="member-gen">Generate one</button></p>
+        <div class="actions"><button class="btn buy" type="submit">Save</button><button class="btn" type="button" id="member-cancel">Cancel</button></div>
+        <p class="msg" id="member-msg"></p>
+      </form>
+      <details class="howto"><summary>Set up reminders on your phone</summary>
+        <ol><li>Install <b>ntfy</b> (App Store or Google Play).</li><li>Tap <b>+</b> → Subscribe to topic, type your exact topic above, server <b>ntfy.sh</b>.</li><li>Allow notifications when asked (iPhone: Settings → ntfy → Allow Notifications, Time Sensitive on).</li><li>Create a countdown with a reminder. The box sends it within ~30s of the reminder time.</li></ol>
+      </details>
+    </div>
+    <div class="card">
+      <p class="t">Push alerts</p>
+      <p class="d">Alerts go to the ntfy app on your iPhone (topic antman-iphone-80f30bef). Send a test to make sure they come through.</p>
+      <div class="actions"><button class="btn buy" id="test-btn">Send test notification</button></div>
+      <p class="msg" id="test-msg"></p>
+    </div>
+    </div>
+    <div class="set-col">
+    <p class="kicker">Tools</p>
     <div class="card fc" id="calc-card">
       <div class="row"><p class="t grow">Fee &amp; profit calculator</p><button type="button" class="linkbtn" id="fc-reset">Clear</button></div>
       <p class="d">Pick where you’re selling; fees fill in from that platform and stay editable. Updates as you type.</p>
@@ -335,37 +396,13 @@
       <div class="fc-out" id="fc-out" aria-live="polite"></div>
       <p class="f" id="fc-asof"></p>
     </div>
-    <div class="card">
-      <p class="t">Appearance</p>
-      <div class="seg" id="theme-seg" style="margin-top:10px"><button data-t="light">Light</button><button data-t="dark">Dark</button><button data-t="auto">Auto</button></div>
-    </div>
-    <div class="card" id="member-card">
-      <p class="t">Who's using this? (members &amp; collectors)</p>
-      <p class="d">Pick yourself so your countdowns and reminders are yours. Saved on this device only.</p>
-      <label class="field">Member<select id="member-pick"></select></label>
-      <p class="d" id="member-topic"></p>
-      <div class="actions"><button class="btn" id="member-edit" type="button">Edit me</button><button class="btn" id="member-add" type="button">+ Add member</button></div>
-      <form id="member-form" hidden autocomplete="off">
-        <label class="field">Name<input type="text" name="name" required maxlength="60" placeholder="e.g. Dev"></label>
-        <label class="field">ntfy topic (for reminders)<input type="text" name="topic" maxlength="64" autocapitalize="off" spellcheck="false" placeholder="e.g. rd-dev-7f3k2q"></label>
-        <p class="hint">Letters, numbers, - and _ only. Pick something hard to guess: anyone who knows a topic can read it. <button class="linkbtn" type="button" id="member-gen">Generate one</button></p>
-        <div class="actions"><button class="btn buy" type="submit">Save</button><button class="btn" type="button" id="member-cancel">Cancel</button></div>
-        <p class="msg" id="member-msg"></p>
-      </form>
-      <details class="howto"><summary>Set up reminders on your phone</summary>
-        <ol><li>Install <b>ntfy</b> (App Store or Google Play).</li><li>Tap <b>+</b> → Subscribe to topic, type your exact topic above, server <b>ntfy.sh</b>.</li><li>Allow notifications when asked (iPhone: Settings → ntfy → Allow Notifications, Time Sensitive on).</li><li>Create a countdown with a reminder. The box sends it within ~30s of the reminder time.</li></ol>
-      </details>
-    </div>
-    <div class="card">
-      <p class="t">Push alerts</p>
-      <p class="d">Alerts go to the ntfy app on your iPhone (topic antman-iphone-80f30bef). Send a test to make sure they come through.</p>
-      <div class="actions"><button class="btn buy" id="test-btn">Send test notification</button></div>
-      <p class="msg" id="test-msg"></p>
-    </div>
+    <p class="kicker">About</p>
     <div class="card">
       <p class="t">How it works</p>
       <p class="d">Watchers run on the Linux box. Status refreshes every 45s; this screen refreshes every 30s. All times are Eastern (ET).</p>
       <p class="d">Risky Drops only watches and links. It never buys, adds to cart, checks out, or stores payment info. You check out yourself.</p>
+    </div>
+      </div>
     </div>
   </section>
   <section class="screen" id="tab-ask" hidden>
@@ -398,15 +435,13 @@
   </section>
 </main>
 <button class="ask-orb" id="ask-open" type="button" aria-label="Ask Risky"><span class="ask-orb-glow"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span class="ask-orb-label">Ask</span></button>
-<nav class="tabbar" role="tablist">
+<nav class="tabbar" role="tablist" aria-label="Main">
   <button data-tab="home" role="tab" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
   <button data-tab="duo" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Duo</button>
   <button data-tab="ps5" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 10v4M6 12h4M16 11h.01M18 13h.01"/></svg>PS5 Pro</button>
-  <button data-tab="people" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg>Pickup</button>
   <button data-tab="watches" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M21 12h-2"/></svg><span class="badge" id="tab-badge"></span>Watches</button>
-  <button data-tab="phones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>Items</button>
-  <button data-tab="sales" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Sales</button>
-  <button data-tab="friends" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg>Friends</button>
+  <button data-tab="people" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg>Pickup</button>
+  <button data-tab="more" role="tab" aria-label="More"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><circle cx="17" cy="17" r="3.6"/></svg>More</button>
 </nav>
 <div class="sheet-back" id="sheet-back" hidden></div>
 <div class="sheet" id="sheet-listing" hidden role="dialog" aria-modal="true" aria-labelledby="sl-title">
@@ -646,10 +681,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261024225549"></script>
-<script src="./js/orbit.js?v=20261024225549"></script>
-<script src="./js/classify.js?v=20261024225549"></script>
-<script src="./js/scanner.js?v=20261024225549"></script>
-<script src="./js/app.js?v=20261024225549"></script>
+<script src="./js/config.js?v=20261024230656"></script>
+<script src="./js/orbit.js?v=20261024230656"></script>
+<script src="./js/classify.js?v=20261024230656"></script>
+<script src="./js/scanner.js?v=20261024230656"></script>
+<script src="./js/app.js?v=20261024230656"></script>
 </body>
 </html>
