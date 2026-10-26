@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var T={navy:'#070d1a',graphite:'#0b0e0d',purple:'#0c0717',ember:'#080605',light:'#f2f5fa',classic:'#030404'},t='navy';try{t=localStorage.getItem('rd-theme2')||'navy'}catch(e){}if(!T[t])t='navy';document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name=theme-color]');if(m)m.content=T[t];})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261024230656">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261024230656">
-<link rel="stylesheet" href="./css/app.css?v=20261024230656">
-<link rel="stylesheet" href="./css/fold.css?v=20261024230656">
+<link rel="stylesheet" href="./css/tokens.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261026182140">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261026182140">
+<link rel="stylesheet" href="./css/app.css?v=20261026182140">
+<link rel="stylesheet" href="./css/fold.css?v=20261026182140">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -118,6 +118,12 @@
   <section class="screen" id="tab-duo" hidden>
     <div class="dz-titlebar"><h2 class="section">Duo Stock</h2><button type="button" class="btn buy dz-go-top" id="duo-go">Check now</button></div>
     <div class="card dz-status" id="duo-status" role="status" aria-live="polite"></div>
+    <div class="card" id="duo-share" style="display:flex;flex-direction:column;gap:8px">
+      <p class="dz-k" style="margin:0">Share Duo view</p>
+      <p class="hint" style="margin:0">A view-only page (stock grid, last NJ drop, watcher status). No login, no key, nothing else from the app.</p>
+      <input id="duo-share-url" type="text" readonly aria-label="Public Duo view link" style="width:100%">
+      <div style="display:flex;gap:8px"><button type="button" class="btn buy" id="duo-share-copy" style="flex:1">Copy link</button><button type="button" class="btn" id="duo-share-send" style="flex:1" hidden>Share…</button></div>
+    </div>
     <div id="duo-out"></div>
     <div class="card ab-row" data-ab role="button" tabindex="0" aria-expanded="false" aria-label="Auto-buy policy status"></div>
     <div class="dz-cols">
@@ -681,10 +687,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261024230656"></script>
-<script src="./js/orbit.js?v=20261024230656"></script>
-<script src="./js/classify.js?v=20261024230656"></script>
-<script src="./js/scanner.js?v=20261024230656"></script>
-<script src="./js/app.js?v=20261024230656"></script>
+<script src="./js/config.js?v=20261026182140"></script>
+<script src="./js/orbit.js?v=20261026182140"></script>
+<script src="./js/classify.js?v=20261026182140"></script>
+<script src="./js/scanner.js?v=20261026182140"></script>
+<script src="./js/app.js?v=20261026182140"></script>
 </body>
 </html>

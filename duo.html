@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>iPhone Duo · NJ stock</title>
+<meta name="theme-color" content="#070d1a">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Cache-Control" content="no-cache">
+<style>
+:root { --bg:#070d1a; --bg2:#0b1426; --card:#111b30; --card2:#1a2744; --text:#eef3ff; --muted:#9db0d0; --faint:#7387ab; --live:#4dff9a; --red:#ff6b61; --amber:#f0b95a; --accent:#5b9bff; --hair:rgba(255,255,255,.10); color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-text-size-adjust:100%; }
+main { max-width: 920px; margin: 0 auto; padding: 14px 14px calc(28px + env(safe-area-inset-bottom)); }
+header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin: 6px 2px 12px; flex-wrap:wrap; }
+h1 { font-size: 22px; margin:0; letter-spacing:-.01em; }
+.pill { display:inline-flex; align-items:center; gap:7px; border-radius:999px; padding:5px 12px; font-weight:700; font-size:13.5px; background:var(--card2); color:var(--muted); white-space:nowrap; }
+.pill i { width:9px; height:9px; border-radius:50%; background:var(--muted); }
+.pill.live { color:var(--live); } .pill.live i { background:var(--live); box-shadow:0 0 8px var(--live); animation:pulse 1.8s ease-in-out infinite; }
+.pill.off { color:var(--red); } .pill.off i { background:var(--red); }
+.pill.pause { color:var(--amber); } .pill.pause i { background:var(--amber); }
+@keyframes pulse { 50% { opacity:.45; } } @media (prefers-reduced-motion: reduce) { .pill.live i { animation:none; } }
+.card { background:var(--card); border:.5px solid var(--hair); border-radius:16px; padding:14px 16px; margin:0 0 12px; }
+.k { margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); }
+.hit b { font-size:18px; display:block; } .hit .m { color:var(--text); font-weight:600; margin-top:2px; } .hit .s { color:var(--muted); }
+.hit a, .tbl a { color:var(--accent); text-decoration:none; }
+.sum { font-weight:700; } .sum.hot { color:var(--live); }
+.wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px; }
+table { border-collapse:separate; border-spacing:0; width:100%; min-width:640px; font-size:13.5px; }
+th, td { padding:8px 6px; text-align:center; border-bottom:.5px solid var(--hair); }
+thead th { color:var(--muted); font-size:12px; font-weight:700; background:var(--bg2); }
+th.store, td.store { text-align:left; position:sticky; left:0; background:var(--card); z-index:1; padding-left:10px; min-width:130px; }
+thead th.store { background:var(--bg2); }
+td.store small { display:block; color:var(--faint); font-size:11.5px; }
+td.in { background:rgba(77,255,154,.16); color:var(--live); font-weight:800; }
+td.in small { display:block; font-weight:600; font-size:10.5px; }
+td.no { color:#3f4c68; } td.yes { color:var(--live); font-weight:700; }
+tr.any td.store b { color:var(--live); }
+.sw { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:-1px; border:1px solid #9aa0ac; }
+.sw.w { background:#f4f1ea; } .sw.n { background:#1b2a4a; }
+.foot { color:var(--faint); font-size:12.5px; margin:6px 2px; }
+.err { color:var(--amber); }
+@media (min-width: 700px) { main { padding-top: 24px; } h1 { font-size: 26px; } table { font-size: 15px; } }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>iPhone Duo · NJ</h1><span class="pill" id="pill" role="status" aria-live="polite"><i></i><span id="pilltx">Loading…</span></span></header>
+  <div class="card hit" id="hit"><p class="k">Last NJ drop</p><div class="s">Loading…</div></div>
+  <div class="card">
+    <p class="k">Pickup stock by store</p>
+    <p class="sum" id="sum"></p>
+    <div class="wrap" tabindex="0" role="region" aria-label="iPhone Duo stock by NJ store and model, scroll sideways"><div id="grid"></div></div>
+  </div>
+  <p class="foot" id="foot">View only. Updates by itself about every 30 seconds.</p>
+</main>
+<script>
+(function () {
+  var CFG = {"supabaseUrl": "https://dqkdtbhdtfieskkfcipo.supabase.co", "publishableKey": "sb_publishable_rhvH9s9gf4yRATvUlvcLvw_9fIuAzzt"};
+  var FRESH = 180, REFRESH_MS = 30000;
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var apple = function (u) { return typeof u === 'string' && /^https:\/\/www\.apple\.com\//.test(u) ? u : ''; };
+  var fmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  var ago = function (s) { if (s == null) return 'unknown'; if (s < 90) return Math.max(0, s) + 's'; if (s < 5400) return Math.round(s / 60) + 'm'; if (s < 172800) return Math.round(s / 3600) + 'h'; return Math.round(s / 86400) + 'd'; };
+  var SIZES = ['256GB', '512GB', '1TB', '2TB'], COLORS = ['Star White', 'Night Sky'];
+  var last = null, lastOk = 0, skew = 0;
+
+  function render(r) {
+    var d = r.duo || {}, now = Math.round(Date.now() / 1000), srv = r.server_ts || now;
+    var passAge = d.last_pass_ts ? srv - d.last_pass_ts : null, syncAge = r.synced_ts ? srv - r.synced_ts : null;
+    var fresh = passAge != null && syncAge != null && passAge < FRESH && syncAge < FRESH;
+    var pill = $('pill');
+    if (!fresh) { pill.className = 'pill off'; $('pilltx').textContent = 'Watcher offline'; }
+    else if (d.paused) { pill.className = 'pill pause'; $('pilltx').textContent = 'Paused'; }
+    else { pill.className = 'pill live'; $('pilltx').textContent = 'Live · checked ' + ago(passAge) + ' ago'; }
+
+    var h = d.last_nj_hit;
+    $('hit').innerHTML = '<p class="k">Last NJ drop</p>' + (h
+      ? '<b>' + esc(h.store) + '</b><div class="s">' + esc(h.city) + ', ' + esc(h.state || 'NJ') + ' ' + esc(h.zip) + '</div><div class="m">' + esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo') + (h.pickup ? ' · ' + esc(h.pickup) : '') + '</div><div class="s">' + esc(h.time_et) + '</div>' + (apple(h.link) ? '<div style="margin-top:6px"><a href="' + esc(apple(h.link)) + '" target="_blank" rel="noopener noreferrer">Open Apple page ↗</a></div>' : '')
+      : '<div class="s">No NJ drop on record yet.</div>');
+
+    var parts = d.parts || [], by = {}; parts.forEach(function (p) { by[p.gb + '|' + p.color] = p.part; });
+    var stores = d.nj_stores || [], n = d.nj_in_stock || 0;
+    var th = SIZES.map(function (z) { return '<th colspan="2">' + z + '</th>'; }).join('');
+    var sub = SIZES.map(function () { return COLORS.map(function (c) { return '<th title="' + c + '"><i class="sw ' + (c === 'Star White' ? 'w' : 'n') + '"></i><span class="vh" style="font-size:11px">' + (c === 'Star White' ? 'White' : 'Night') + '</span></th>'; }).join(''); }).join('');
+    var rows = stores.map(function (s) {
+      var have = {}; (s.in_stock || []).forEach(function (i) { have[i.part] = i; });
+      var any = (s.in_stock || []).length > 0;
+      var cells = SIZES.map(function (z) { return COLORS.map(function (c) {
+        var it = have[by[z + '|' + c]];
+        return it ? '<td class="in" title="' + esc(z + ' ' + c) + ' in stock for pickup">' + (apple(it.link) ? '<a href="' + esc(apple(it.link)) + '" target="_blank" rel="noopener noreferrer" style="color:inherit">✓</a>' : '✓') + (it.pickup ? '<small>' + esc(it.pickup) + '</small>' : '') + '</td>' : '<td class="no">·</td>';
+      }).join(''); }).join('');
+      return '<tr class="' + (any ? 'any' : '') + '"><td class="store"><b>' + esc(s.name) + '</b><small>' + esc(s.city) + ' ' + esc(s.zip) + '</small></td>' + cells + '</tr>';
+    }).join('');
+    var on = d.online || {};
+    var onl = '<tr><td class="store"><b>Apple.com online</b><small>ships</small></td>' + SIZES.map(function (z) { return COLORS.map(function (c) {
+      var o = on[by[z + '|' + c]];
+      return o ? (o.buyable ? '<td class="yes" title="' + esc(o.ships) + '">Buy</td>' : '<td class="no">–</td>') : '<td class="no">?</td>';
+    }).join(''); }).join('') + '</tr>';
+    $('sum').className = 'sum' + (n ? ' hot' : '');
+    $('sum').textContent = n ? n + ' pickup ' + (n === 1 ? 'listing' : 'listings') + ' in stock in NJ right now' : 'Nothing in stock for pickup at NJ stores right now.';
+    $('grid').innerHTML = '<table class="tbl"><thead><tr><th class="store" rowspan="2">Store</th>' + th + '</tr><tr>' + sub + '</tr></thead><tbody>' + rows + onl + '</tbody></table>';
+    $('foot').className = 'foot';
+    $('foot').textContent = 'View only · updated ' + fmt.format(new Date()) + ' ET · refreshes by itself every 30s' + (d.generated_et ? ' · data from ' + d.generated_et : '');
+  }
+
+  function load() {
+    var ctl = window.AbortController ? new AbortController() : null, t = ctl && setTimeout(function () { ctl.abort(); }, 15000);
+    fetch(CFG.supabaseUrl + '/rest/v1/rpc/rd_public_duo', { method: 'POST', headers: { apikey: CFG.publishableKey, 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) { if (t) clearTimeout(t); if (!j || !j.ok) throw new Error('No data yet'); last = j; lastOk = Date.now(); render(j); })
+      .catch(function (e) {
+        if (t) clearTimeout(t);
+        if (last) { render(last); $('foot').className = 'foot err'; $('foot').textContent = 'Connection problem, showing the last data (' + ago(Math.round((Date.now() - lastOk) / 1000)) + ' old). Retrying…'; }
+        else { $('pilltx').textContent = 'Offline'; $('pill').className = 'pill off'; $('hit').innerHTML = '<p class="k">Last NJ drop</p><div class="s err">Could not load: ' + esc(e.message) + '. Retrying…</div>'; }
+      });
+  }
+  load(); setInterval(load, REFRESH_MS);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - lastOk > 15000) load(); });
+})();
+</script>
+</body>
+</html>

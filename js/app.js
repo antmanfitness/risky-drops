@@ -1916,6 +1916,19 @@
     out.innerHTML = `${sum}<p class="dz-k" style="margin:10px 2px 6px">Stock by store · every color and size</p>${duoTable(r, sel)}
       <p class="hint" style="margin:8px 2px 0">Scroll sideways for all sizes. Your colors and sizes are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys.</p>`;
   }
+  // Share Duo view (Oct 26): public read-only page duo.html next to this app. The link is built from the page path only, never from ?key= or the token.
+  const duoShareUrl = () => new URL('duo.html', location.origin + location.pathname.replace(/[^/]*$/, '')).href;
+  (function duoShareInit() {
+    const inp = $('#duo-share-url'), cp = $('#duo-share-copy'), sh = $('#duo-share-send'); if (!inp || !cp) return;
+    inp.value = duoShareUrl(); inp.addEventListener('focus', () => inp.select());
+    if (navigator.share) sh.hidden = false;
+    cp.addEventListener('click', async () => {
+      const u = duoShareUrl(); inp.value = u;
+      try { await navigator.clipboard.writeText(u); toast('Duo view link copied'); }
+      catch (e) { inp.focus(); inp.select(); try { document.execCommand('copy'); toast('Duo view link copied'); } catch (e2) { toast('Press and hold the link to copy it'); } }
+    });
+    sh.addEventListener('click', () => { navigator.share({ title: 'iPhone Duo NJ stock', url: duoShareUrl() }).catch(() => {}); });
+  })();
   const duoRender = () => { duoRenderStatus(); duoRenderWant(); duoRenderStores(); duoRenderOut(); };
   async function duoRun(force) {
     const zip = ($('#duo-zip').value || '').trim(), msg = $('#duo-msg');
