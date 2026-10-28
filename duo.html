@@ -25,6 +25,13 @@ h1 { font-size: 22px; margin:0; letter-spacing:-.01em; }
 .k { margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); }
 .hit b { font-size:18px; display:block; } .hit .m { color:var(--text); font-weight:600; margin-top:2px; } .hit .s { color:var(--muted); }
 .hit a, .tbl a { color:var(--accent); text-decoration:none; }
+.hl .row { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
+.hl .cad { color:var(--muted); font-weight:600; }
+.hl .st { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-top:10px; }
+.hl .st div { background:var(--card2); border-radius:12px; padding:9px 4px 8px; text-align:center; min-height:58px; display:flex; flex-direction:column; justify-content:center; min-width:0; }
+.hl .st b { display:block; font-size:20px; line-height:1.15; font-variant-numeric:tabular-nums; } .hl .st b.sm { font-size:13px; line-height:1.25; } .hl .st b.no { font-size:14px; color:var(--muted); }
+.hl .st small { display:block; margin-top:2px; color:var(--muted); font-size:11.5px; font-weight:600; }
+.pill.warn { color:var(--amber); } .pill.warn i { background:var(--amber); } .pill.ok { color:var(--live); } .pill.ok i { background:var(--live); }
 .sum { font-weight:700; } .sum.hot { color:var(--live); }
 .wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px; }
 table { border-collapse:separate; border-spacing:0; width:100%; min-width:640px; font-size:13.5px; }
@@ -61,6 +68,7 @@ td.store .zipbtn { min-height:40px; font-size:14px; padding:0 9px; margin-top:3p
 <body>
 <main>
   <header><h1>iPhone Duo · NJ</h1><span class="pill" id="pill" role="status" aria-live="polite"><i></i><span id="pilltx">Loading…</span></span></header>
+  <div class="card hl" id="hl" role="status"><p class="k">Apple health</p><div class="s">Loading…</div></div>
   <div class="card hit" id="hit"><p class="k">Last NJ drop</p><div class="s">Loading…</div></div>
   <div class="card">
     <p class="k">Pickup stock by store</p>
@@ -109,6 +117,20 @@ td.store .zipbtn { min-height:40px; font-size:14px; padding:0 9px; margin-top:3p
     else if (d.paused) { pill.className = 'pill pause'; $('pilltx').textContent = 'Paused'; }
     else { pill.className = 'pill live'; $('pilltx').textContent = 'Live · checked ' + ago(passAge) + ' ago'; }
 
+    // Apple health: counts + status only (the public RPC whitelists exactly these fields; no keys, IPs, error details or checkout data)
+    var hh = d.health, hl = $('hl'), nowS = srv;
+    if (!hh || !hh.has_data) hl.innerHTML = '<p class="k">Apple health</p><div class="row"><span class="pill"><i></i>No data yet</span></div>';
+    else {
+      var normal = hh.normal_cadence || d.cadence || 10, slow = hh.slow_cadence || 60;
+      var backing = fresh && !d.paused && hh.slow_until_ts && nowS < hh.slow_until_ts;
+      var cls = !fresh || d.paused ? '' : backing ? 'warn' : 'ok', tx = !fresh ? 'Not checking right now' : d.paused ? 'Paused' : backing ? 'Backing off' : 'Healthy';
+      var cad = !fresh || d.paused ? '' : backing ? 'Slow mode: every ' + Math.max(slow, normal) + 's' : 'Checking every ' + normal + 's';
+      var n0 = hh.blocks_today, n7 = hh.blocks_7d;
+      hl.innerHTML = '<p class="k">Apple health</p><div class="row"><span class="pill ' + cls + '"><i></i>' + tx + '</span>' + (cad ? '<span class="cad">' + esc(cad) + '</span>' : '') + '</div>'
+        + '<div class="st"><div><b>' + (n0 == null ? '?' : esc(n0)) + '</b><small>blocks today</small></div><div><b>' + (n7 == null ? '?' : esc(n7)) + '</b><small>last 7 days</small></div><div>'
+        + (hh.last_block_et ? '<b class="sm">' + esc(String(hh.last_block_et).replace(/ ET$/, '')) + '</b>' : '<b class="no">None</b>') + '<small>last block (ET)</small></div></div>'
+        + '<p class="rule">A block = Apple answered 403, 429 or 503 and the watcher slowed down.' + (hh.log_since_ts && nowS - hh.log_since_ts < 7 * 86400 ? ' Counting since ' + esc(String(hh.log_since_et || '')) + '.' : '') + '</p>';
+    }
     var h = d.last_nj_hit;
     $('hit').innerHTML = '<p class="k">Last NJ drop</p>' + (h
       ? '<b>' + esc(h.store) + '</b><div class="s">' + esc(h.city) + ', ' + esc(h.state || 'NJ') + '</div><div>' + zipBtn(h.zip) + '</div><div class="m">' + esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo') + (h.pickup ? ' · ' + esc(h.pickup) : '') + '</div><div class="s">' + esc(h.time_et) + '</div>' + (apple(h.link) ? '<div style="margin-top:6px"><a href="' + esc(apple(h.link)) + '" target="_blank" rel="noopener noreferrer">Open Apple page ↗</a></div>' : '')

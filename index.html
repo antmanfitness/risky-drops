@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var T={navy:'#070d1a',graphite:'#0b0e0d',purple:'#0c0717',ember:'#080605',light:'#f2f5fa',classic:'#030404'},t='navy';try{t=localStorage.getItem('rd-theme2')||'navy'}catch(e){}if(!T[t])t='navy';document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name=theme-color]');if(m)m.content=T[t];})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261027215312">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261027215312">
-<link rel="stylesheet" href="./css/app.css?v=20261027215312">
-<link rel="stylesheet" href="./css/fold.css?v=20261027215312">
+<link rel="stylesheet" href="./css/tokens.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261027222636">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261027222636">
+<link rel="stylesheet" href="./css/app.css?v=20261027222636">
+<link rel="stylesheet" href="./css/fold.css?v=20261027222636">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -115,38 +115,47 @@
     <div class="dash-grid" id="dash-stats"></div>
     <div id="dash-cards"></div>
   </section>
-  <section class="screen" id="tab-duo" hidden>
+  <section class="screen dz-screen" id="tab-duo" hidden>
     <div class="dz-titlebar"><h2 class="section">Duo Stock</h2><button type="button" class="btn buy dz-go-top" id="duo-go">Check now</button></div>
+    <!-- 1. Status: watcher + Apple health / blocks + last checkout run -->
     <div class="card dz-status" id="duo-status" role="status" aria-live="polite"></div>
-    <div id="duo-trend"></div>
-    <div class="card" id="duo-share" style="display:flex;flex-direction:column;gap:8px">
-      <p class="dz-k" style="margin:0">Share Duo view</p>
-      <p class="hint" style="margin:0">A view-only page (stock grid, last NJ drop, watcher status). No login, no key, nothing else from the app.</p>
-      <input id="duo-share-url" type="text" readonly aria-label="Public Duo view link" style="width:100%">
-      <div style="display:flex;gap:8px"><button type="button" class="btn buy" id="duo-share-copy" style="flex:1">Copy link</button><button type="button" class="btn" id="duo-share-send" style="flex:1" hidden>Share…</button></div>
-    </div>
-    <div id="duo-out"></div>
     <div class="card ab-row" data-ab role="button" tabindex="0" aria-expanded="false" aria-label="Auto-buy policy status"></div>
-    <div class="dz-cols">
-    <div class="card dz-want" id="duo-want">
+    <!-- 2. Last NJ drop -->
+    <div class="card dz-card" id="duo-hit"></div>
+    <!-- 3. Nearest stores (ZIP lives here: it drives Check now and the list) -->
+    <div class="card dz-card dz-stores-card">
+      <form id="duo-form" autocomplete="off" class="dz-zip">
+        <span class="dz-zip-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <input id="duo-zip" name="zip" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="ZIP code" autocomplete="postal-code" enterkeyhint="search" aria-label="ZIP code">
+      </form>
+      <p class="msg dz-msg" id="duo-msg" role="status"></p>
+      <div id="duo-stores"></div>
+    </div>
+    <!-- 4. Trending drops -->
+    <div class="card dz-card" id="duo-trend"></div>
+    <!-- 5-7. Less-used sections, collapsed by default (open state is remembered on this device) -->
+    <details class="card dz-fold" id="duo-f-stock" data-fold="stock"><summary><span class="dz-fold-t">Stock table</span><span class="dz-fold-s">Every size and color</span><svg class="dz-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <div class="dz-fold-b" id="duo-out"></div></details>
+    <details class="card dz-fold" id="duo-f-share" data-fold="share"><summary><span class="dz-fold-t">Share Duo view</span><span class="dz-fold-s">Public, view only</span><svg class="dz-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <div class="dz-fold-b" id="duo-share" style="display:flex;flex-direction:column;gap:8px">
+        <p class="hint" style="margin:0">A view-only page (stock grid, last NJ drop, watcher health counts). No login, no key, nothing else from the app.</p>
+        <input id="duo-share-url" type="text" readonly aria-label="Public Duo view link" style="width:100%">
+        <div style="display:flex;gap:8px"><button type="button" class="btn buy" id="duo-share-copy" style="flex:1">Copy link</button><button type="button" class="btn" id="duo-share-send" style="flex:1" hidden>Share…</button></div>
+      </div></details>
+    <details class="card dz-fold" id="duo-f-set" data-fold="settings"><summary><span class="dz-fold-t">Settings</span><span class="dz-fold-s" id="duo-set-sum">What I want, interval, pause</span><svg class="dz-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <div class="dz-fold-b dz-want" id="duo-want">
       <p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>What I want</p>
       <div class="dz-chips two" id="duo-colors" role="group" aria-label="Colors"></div>
       <div class="dz-chips four" id="duo-sizes" role="group" aria-label="Memory"></div>
       <div class="dz-carrier" id="duo-carrier" role="group" aria-label="Carrier"></div>
       <p class="hint" id="duo-carrier-note" hidden></p>
-      <form id="duo-form" autocomplete="off" class="dz-zip">
-        <span class="dz-zip-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
-        <input id="duo-zip" name="zip" type="text" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="ZIP code" autocomplete="postal-code" enterkeyhint="search" aria-label="ZIP code">
-      </form>
       <div class="dz-line"><span class="dz-line-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg><span id="duo-cad-t">Check every 30s</span></span>
         <span class="dz-step"><button type="button" id="duo-cad-minus" aria-label="Check less often">−</button><button type="button" id="duo-cad-plus" aria-label="Check more often">+</button></span></div>
       <div class="dz-line"><span class="dz-line-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>Pause checking</span>
         <button type="button" class="dz-switch" id="duo-pause" role="switch" aria-checked="false" aria-label="Pause checking"><i></i></button></div>
-      <p class="msg" id="duo-msg" role="status"></p>
+      <p class="msg" id="duo-set-msg" role="status"></p>
       <button type="button" class="btn dz-test" id="duo-test">Send a TEST ping to my phone</button>
-    </div>
-    <div class="card dz-stores" id="duo-stores"></div>
-    </div>
+      </div></details>
   </section>
   <section class="screen" id="tab-people" hidden>
     <div class="dz-titlebar"><h2 class="section">Pickup people</h2><button type="button" class="btn buy dz-go-top" id="pp-add" aria-haspopup="dialog">+ Add person</button></div>
@@ -688,10 +697,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261027215312"></script>
-<script src="./js/orbit.js?v=20261027215312"></script>
-<script src="./js/classify.js?v=20261027215312"></script>
-<script src="./js/scanner.js?v=20261027215312"></script>
-<script src="./js/app.js?v=20261027215312"></script>
+<script src="./js/config.js?v=20261027222636"></script>
+<script src="./js/orbit.js?v=20261027222636"></script>
+<script src="./js/classify.js?v=20261027222636"></script>
+<script src="./js/scanner.js?v=20261027222636"></script>
+<script src="./js/app.js?v=20261027222636"></script>
 </body>
 </html>

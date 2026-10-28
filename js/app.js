@@ -1862,12 +1862,41 @@
   }
   document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('[data-zip]'); if (b) { e.preventDefault(); copyZip(b.getAttribute('data-zip')); } });
   function duoRenderTrend() {
-    const el = $('#duo-trend'); if (!el) return;
+    const el = $('#duo-trend'), hel = $('#duo-hit'); if (!el || !hel) return;
     const inv = (state.status && state.status.duo_inventory) || {}, h = inv.last_nj_hit, tr = inv.trending || [];
-    if (!state.status || !state.status.duo_inventory) { el.innerHTML = ''; return; }
-    const hit = h ? `<p class="dz-k">Last NJ drop</p><b class="zt-n">${esc(h.store)}</b><div class="zt-s">${esc(h.city)}, ${esc(h.state || 'NJ')}</div>${zipBtn(h.zip)}<div class="zt-m">${esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo')}${h.pickup ? ' · ' + esc(h.pickup) : ''}</div><div class="zt-s">${esc(h.time_et)}</div>${apple(h.link) ? `<div style="margin-top:6px"><a href="${esc(apple(h.link))}" target="_blank" rel="noopener noreferrer">Open Apple page ↗</a></div>` : ''}` : '<p class="dz-k">Last NJ drop</p><p class="d">No NJ drop on record yet.</p>';
-    const list = tr.length ? `<ol class="zt-list">${tr.map((t, i) => `<li><span class="zt-rk">${i + 1}</span><div class="zt-nm">${esc(t.name)} <small>${esc(t.city)}, ${esc(t.state || 'NJ')}</small></div><div class="zt-cnt">${esc(t.drops)}<small>${t.drops === 1 ? 'drop' : 'drops'}</small></div><div class="zt-d">Last drop <b>${esc(t.last_drop_et)}</b><br>Usually <b>${esc(t.window)}</b>${t.days > 1 ? ' · on ' + esc(t.days) + ' days' : ''}<br>${esc((t.models || []).join(' · '))}</div><div class="zt-z">${zipBtn(t.zip)}</div></li>`).join('')}</ol><p class="hint">Ranked by distinct drops: a store going from no stock to stock for a model counts once; repeats within 15 minutes merge. Built from the watcher’s verified alerts (history in iphoneduo/drop_history.json). NJ only here; NY/PA/DE drops are kept in the file.</p>` : '<p class="d">No NJ drops recorded yet.</p>';
-    el.innerHTML = `<div class="card zt-card">${hit}</div><div class="card zt-card"><p class="dz-k">Trending drops · NJ</p>${list}</div>`;
+    if (!state.status || !state.status.duo_inventory) { el.innerHTML = ''; hel.innerHTML = ''; return; }
+    const pin = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+    hel.innerHTML = `<p class="dz-k">${pin}Last NJ drop</p>` + (h
+      ? `<b class="dz-big-n">${esc(h.store)}</b><div class="dz-sub">${esc(h.city)}, ${esc(h.state || 'NJ')} · ${esc(h.time_et)}</div><div class="dz-model">${esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo')}${h.pickup ? '<span> · ' + esc(h.pickup) + '</span>' : ''}</div>
+        <div class="dz-acts">${zipBtn(h.zip)}${apple(h.link) ? `<a class="dz-act" href="${esc(apple(h.link))}" target="_blank" rel="noopener noreferrer">Apple page ↗</a>` : ''}</div>`
+      : '<p class="d">No NJ drop on record yet.</p>');
+    const row = (t, i) => `<li><span class="zt-rk">${i + 1}</span><div class="zt-nm">${esc(t.name)} <small>${esc(t.city)}, ${esc(t.state || 'NJ')}</small></div><div class="zt-cnt">${esc(t.drops)}<small>${t.drops === 1 ? 'drop' : 'drops'}</small></div><div class="zt-d">Last drop <b>${esc(t.last_drop_et)}</b><br>Usually <b>${esc(t.window)}</b>${t.days > 1 ? ' · on ' + esc(t.days) + ' days' : ''}<br>${esc((t.models || []).join(' · '))}</div><div class="zt-z">${zipBtn(t.zip)}</div></li>`;
+    const TOP = 5, rest = tr.slice(TOP);
+    const list = tr.length ? `<ol class="zt-list">${tr.slice(0, TOP).map(row).join('')}</ol>${rest.length ? `<details class="dz-det dz-more" ${duo.trendOpen ? 'open' : ''}><summary>Show ${rest.length} more</summary><ol class="zt-list">${rest.map((t, i) => row(t, i + TOP)).join('')}</ol></details>` : ''}<p class="hint">Ranked by distinct drops: a store going from no stock to stock for a model counts once; repeats within 15 minutes merge. Built from the watcher’s verified alerts. NJ only here.</p>` : '<p class="d">No NJ drops recorded yet.</p>';
+    el.innerHTML = `<p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>Trending drops · NJ</p>${list}`;
+  }
+  // Oct 27: Apple health / blocks. All numbers come from the watcher's own log lines (status.duo_inventory.apple_health, built box-side by watch_health.py);
+  // missing data shows 'no data yet', never a made-up number. Checkout health is the last run in autobuy.log (admin only).
+  function duoHealthHtml(paused, stale) {
+    const inv = (state.status && state.status.duo_inventory) || {}, a = inv.apple_health, c = inv.checkout_health;
+    const num = (v) => (v == null ? 'no data yet' : v);
+    let body;
+    if (!a || !a.has_data) {
+      body = '<div class="dz-hl-top"><span class="dz-pill none"><i></i>No data yet</span></div><p class="f">The watcher log has no readable health lines yet.</p>';
+    } else {
+      const nowS = Date.now() / 1000, normal = a.normal_cadence || duo.prefs.cadence || 10, slow = a.slow_cadence || 60;
+      const backing = !paused && !stale && a.slow_until_ts && nowS < a.slow_until_ts;
+      const cls = paused ? 'none' : stale ? 'warn' : backing ? 'warn' : 'ok', txt = paused ? 'Paused' : stale ? 'No recent checks' : backing ? 'Backing off' : 'Healthy';
+      const cad = paused ? 'Checking is paused' : backing ? `Slow mode: every ${Math.max(slow, normal)}s (normal ${normal}s)` : `Checking every ${normal}s`;
+      const since = a.log_since_ts && nowS - a.log_since_ts < 7 * 86400 ? ` Log starts ${esc(a.log_since_et)}, so “7 days” covers less than 7 days.` : '';
+      const other = (a.other_7d || 0) > 0 ? `Other Apple errors (HTTP 541, timeouts): ${a.other_today} today · ${a.other_7d} in 7 days.` : 'No other Apple errors in 7 days.';
+      const slowWhy = backing && a.last_slow_et ? ` Slow mode started ${esc(a.last_slow_et)} (${/^\d+$/.test(a.last_slow_kind || '') ? 'HTTP ' + esc(a.last_slow_kind) : esc(a.last_slow_kind || 'error')}) and lasts 10 minutes.` : '';
+      body = `<div class="dz-hl-top"><span class="dz-pill ${cls}"><i></i>${txt}</span><span class="dz-hl-cad">${esc(cad)}</span></div>
+        <div class="dz-stats"><div><b>${num(a.blocks_today)}</b><small>blocks today</small></div><div><b>${num(a.blocks_7d)}</b><small>last 7 days</small></div><div><b class="${a.last_block_et ? 'sm' : 'none'}">${a.last_block_et ? esc(a.last_block_et.replace(/ ET$/, '')) : 'None'}</b><small>last block (ET)</small></div></div>
+        <p class="f">Blocks = Apple answered 403, 429 or 503 and the watcher backed off. ${other}${slowWhy}${since}</p>`;
+    }
+    const co = !c || !c.has_data ? 'no data yet' : `${esc(c.label)}${c.model ? ' · ' + esc(c.model) : ''} · ${esc(c.et)}`;
+    return `<div class="dz-sep"></div><p class="dz-k">Apple health / blocks</p>${body}<p class="dz-co"><b>Checkout${c && c.has_data && c.kind === 'dry run' ? ' (dry run)' : ''}:</b> ${co}</p>`;
   }
   function duoRenderStatus() {
     const el = $('#duo-status'); if (!el) return;
@@ -1881,7 +1910,7 @@
     const when = w && w.last_pass_ts ? `Last check ${esc(dago(w.last_pass_ts))} · ${esc(etTime.format(new Date(w.last_pass_ts * 1000)))} ET` : 'No check recorded yet.';
     el.className = 'card dz-status ' + cls;
     el.innerHTML = `<div class="dz-st-row"><span class="dz-dot" aria-hidden="true"></span><b class="grow">${title}</b><span class="dz-ok" aria-hidden="true">${paused ? '❚❚' : stale ? '!' : '✓'}</span></div>
-      <p class="d">${sub}</p><p class="f">${when}${paused ? ' · pauses auto-resume after 2 hours' : ''}${stale && w ? ' · the watcher on the box hasn’t checked recently' : ''}</p>`;
+      <p class="d">${sub}</p><p class="f">${when}${paused ? ' · pauses auto-resume after 2 hours' : ''}${stale && w ? ' · the watcher on the box hasn’t checked recently' : ''}</p>${duoHealthHtml(paused, stale)}`;
   }
   function duoRenderWant() {
     const sel = duoSel();
@@ -1891,7 +1920,8 @@
     $('#duo-cad-t').textContent = `Check every ${duo.prefs.cadence || 30}s`;
     $('#duo-cad-minus').disabled = (duo.prefs.cadence || 30) >= 300; $('#duo-cad-plus').disabled = (duo.prefs.cadence || 30) <= 30;
     const p = duoPaused(); const sw = $('#duo-pause'); sw.setAttribute('aria-checked', p ? 'true' : 'false'); sw.classList.toggle('on', p);
-    const m = $('#duo-msg'); if (duo.saveMsg) { m.className = 'msg' + (/^Saved/.test(duo.saveMsg) ? '' : ' err'); m.textContent = duo.saveMsg; }
+    const m = $('#duo-set-msg'); if (duo.saveMsg) { m.className = 'msg' + (/^Saved/.test(duo.saveMsg) ? '' : ' err'); m.textContent = duo.saveMsg; }
+    const ss = $('#duo-set-sum'); if (ss) ss.textContent = `${sel.parts.size} model${sel.parts.size === 1 ? '' : 's'} · every ${duo.prefs.cadence || 30}s${duoPaused() ? ' · paused' : ''}`;
   }
   function duoHitChips(s, sel) {
     return DUO_ALL.filter((p) => s.avail && s.avail[p] === 'available' && sel.parts.has(p)).map((p) => `<a class="dz-hit" href="${esc(DUO_SLUG(p))}" target="_blank" rel="noopener noreferrer">${esc(DUO_INFO[p].storage + ' ' + DUO_INFO[p].color)} ↗</a>`).join('');
@@ -1931,15 +1961,26 @@
   }
   function duoRenderOut() {
     const out = $('#duo-out'), r = duo.res; if (!out) return;
-    if (!r || (r.ok === false && r.error)) { out.innerHTML = ''; return; }
+    if (!r || (r.ok === false && r.error)) { out.innerHTML = '<p class="d">Tap Check now to load stock for your ZIP.</p>'; return; }
     const sel = duoSel(), all = r.stores || [];
     const avail = all.filter((s) => r.parts.some((p) => sel.parts.has(p.part) && s.avail[p.part] === 'available')).length;
     const when = r.checked_ts ? `${duo.saved ? 'Last checked' : 'Checked'} ${esc(etTime.format(new Date(r.checked_ts * 1000)))} ET${r.cached && !duo.saved ? ' (cached)' : ''}` : '';
     const quote = !r.pickup_error && !avail && all.some((s) => s.quote) ? ` Apple says: “${esc((all.find((s) => s.quote) || {}).quote)}”.` : '';
     const sum = r.pickup_error ? '' : `<p class="dz-sum ${avail ? 'hot' : ''}">${avail ? `<b>${avail} store${avail === 1 ? '' : 's'} with your Duo for pickup</b>` : 'None of your selected models are in stock for pickup right now.'} <span class="dz-when">${when}.${quote}</span></p>`;
-    out.innerHTML = `${sum}<p class="dz-k" style="margin:10px 2px 6px">Stock by store · every color and size</p>${duoTable(r, sel)}
-      <p class="hint" style="margin:8px 2px 0">Scroll sideways for all sizes. Your colors and sizes are highlighted. Tap a store for its Apple page, or a cell for that model’s Apple page. Read-only: Risky Drops never adds to cart or buys.</p>`;
+    out.innerHTML = `${sum}${duoTable(r, sel)}
+      <p class="hint" style="margin:8px 2px 0">Swipe the table sideways for all sizes. Your colors and sizes are highlighted. Tap a store or a cell for its Apple page. Read-only: Risky Drops never adds to cart or buys.</p>`;
   }
+  // Oct 27: collapsible Duo sections (Stock table, Share, Settings). Closed by default; open state is remembered on this device. 'Show more' in Trending too.
+  (function duoFolds() {
+    let st = {}; try { st = JSON.parse(localStorage.getItem('rd-duo-open') || '{}') || {}; } catch (e) { st = {}; }
+    document.querySelectorAll('#tab-duo details.dz-fold').forEach((d) => { d.open = !!st[d.dataset.fold]; });
+    const tab = $('#tab-duo'); if (!tab) return;
+    tab.addEventListener('toggle', (e) => {
+      const d = e.target; if (!d || d.tagName !== 'DETAILS') return;
+      if (d.classList.contains('dz-more')) { duo.trendOpen = d.open; return; }
+      if (d.dataset.fold) { st[d.dataset.fold] = d.open; try { localStorage.setItem('rd-duo-open', JSON.stringify(st)); } catch (e2) { /* quota */ } }
+    }, true);
+  })();
   // Share Duo view (Oct 26): public read-only page duo.html next to this app. The link is built from the page path only, never from ?key= or the token.
   const duoShareUrl = () => new URL('duo.html', location.origin + location.pathname.replace(/[^/]*$/, '')).href;
   (function duoShareInit() {
@@ -2015,7 +2056,7 @@
       const d = new Set(duo.prefs.dropped || []); if (d.has(b.dataset.drop)) d.delete(b.dataset.drop); else d.add(b.dataset.drop); duoSave({ dropped: [...d] }); });
     $('#duo-test').addEventListener('click', async () => {
       if (!confirm('Send a TEST ping to your phone? It is labelled TEST ONLY and links to the real Apple page.')) return;
-      const m = $('#duo-msg'); m.className = 'msg'; m.textContent = 'Sending the test ping…';
+      const m = $('#duo-set-msg'); m.className = 'msg'; m.textContent = 'Sending the test ping…';
       try { await quick('test_notify', { which: 'duo' }, 60000); m.textContent = 'TEST ping sent. Check your phone.'; } catch (e) { m.className = 'msg err'; m.textContent = e.message; }
     });
   } else { document.querySelectorAll('.tabbar [data-tab="duo"], .tabbar [data-tab="ps5"]').forEach((b) => (b.hidden = true)); }

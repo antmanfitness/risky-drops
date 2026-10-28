@@ -668,3 +668,65 @@ td.emph .dz { font-size: 11.5px; }
 .zt-nm { font-weight: 800; font-size: 16px; min-width: 0; overflow-wrap: anywhere; } .zt-nm small { color: var(--muted); font-weight: 500; font-size: 13.5px; }
 .zt-cnt { text-align: right; font-weight: 800; font-size: 18px; line-height: 1.1; white-space: nowrap; } .zt-cnt small { display: block; color: var(--muted); font-weight: 600; font-size: 11.5px; }
 .zt-d { grid-column: 2 / span 2; color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere; } .zt-d b { color: var(--text); font-weight: 600; } .zt-z { grid-column: 2 / span 2; }
+
+/* ---------- Oct 27: Duo tab cleanup. One column of cards: Status (with Apple health), Last NJ drop, Nearest stores, Trending, then
+   collapsible Stock table / Share / Settings. Phone first (360-430), no page-level horizontal scroll, tap targets >= 44px (switch 40). All colours from tokens. ---------- */
+#tab-duo.dz-screen { max-width: 680px; margin-left: auto; margin-right: auto; }
+#tab-duo .card { border-radius: 20px; margin: 0 0 12px; }
+#tab-duo .card.dz-card, #tab-duo .card.dz-status { padding: 16px; }
+#tab-duo .dz-k { margin: 0 0 12px; }
+#tab-duo .card .d { font-size: 14.5px; }
+#tab-duo .hint { margin: 10px 2px 0; font-size: 12.5px; }
+.dz-sep { height: 0; border-top: 0.5px solid var(--hair); margin: 14px -4px 14px; }
+.dz-status .dz-k { margin-bottom: 10px; }
+.dz-hl-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.dz-hl-cad { color: var(--muted); font-size: 14.5px; font-weight: 600; }
+.dz-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14.5px; font-weight: 800; letter-spacing: -.005em; background: var(--card-2); color: var(--muted); white-space: nowrap; }
+.dz-pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.dz-pill.ok { color: var(--live); background: rgba(var(--live-rgb), .14); } .dz-pill.ok i { background: var(--live); box-shadow: 0 0 0 3px rgba(var(--live-rgb), .2); }
+.dz-pill.warn { color: var(--amber); background: rgba(224, 176, 90, .16); } .dz-pill.warn i { background: var(--amber); box-shadow: 0 0 0 3px rgba(224, 176, 90, .22); }
+[data-theme="light"] .dz-pill.ok { color: #14632f; } [data-theme="light"] .dz-pill.warn { color: #8a5a00; }
+.dz-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
+.dz-stats > div { background: var(--card-2); border-radius: 14px; padding: 10px 6px 9px; text-align: center; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 66px; }
+.dz-stats b { display: block; font-size: 22px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dz-stats b.sm { font-size: 13.5px; line-height: 1.25; letter-spacing: 0; } .dz-stats b.none { font-size: 15px; color: var(--muted); font-weight: 700; }
+.dz-stats small { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+#tab-duo .dz-status .f { font-size: 12.5px; line-height: 1.4; }
+.dz-co { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--card-2); font-size: 13.5px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; } .dz-co b { color: var(--text); }
+/* Last NJ drop */
+.dz-big-n { display: block; font-size: 19px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+.dz-sub { margin-top: 3px; color: var(--muted); font-size: 14px; }
+.dz-model { margin: 8px 0 10px; font-size: 15.5px; font-weight: 700; } .dz-model span { color: var(--muted); font-weight: 500; }
+.dz-acts { display: flex; flex-wrap: wrap; gap: 8px; } .dz-acts .zipbtn { margin: 0; }
+.dz-act { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--hair); background: var(--card-2); color: var(--accent); font-weight: 700; font-size: 15px; text-decoration: none; }
+/* Nearest stores */
+.dz-stores-card .dz-zip { margin: 0 0 6px; }
+.dz-stores-card .dz-msg { margin: 0 2px 8px; min-height: 0; } .dz-stores-card .dz-msg:empty { display: none; }
+#duo-stores .dz-k { margin: 8px 0 2px; }
+#duo-stores .dz-srow:first-of-type { border-top: 0; }
+/* Trending */
+#duo-trend .zt-list li:first-child { border-top: 0; padding-top: 2px; }
+.dz-more { margin: 4px 0 0; } .dz-more > summary { color: var(--accent); }
+/* Collapsible sections */
+details.dz-fold { padding: 0; overflow: hidden; }
+details.dz-fold > summary { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 16px; cursor: pointer; list-style: none; -webkit-tap-highlight-color: transparent; }
+details.dz-fold > summary::-webkit-details-marker { display: none; }
+details.dz-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dz-fold-t { font-size: 16px; font-weight: 700; letter-spacing: -.01em; flex: none; }
+.dz-fold-s { flex: 1; min-width: 0; text-align: right; color: var(--muted); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dz-chev { flex: none; width: 18px; height: 18px; color: var(--faint); transition: transform .15s; }
+details.dz-fold[open] > summary .dz-chev { transform: rotate(90deg); }
+details.dz-fold[open] > summary { border-bottom: 0.5px solid var(--hair); }
+.dz-fold-b { padding: 14px 16px 16px; min-width: 0; }
+.dz-fold-b.dz-want { border-radius: 0; }
+.dz-fold-b .dz-wrap { margin: 0; border-radius: 14px; border: 0.5px solid var(--hair); background: var(--card); }
+.dz-fold-b .dz-sum { margin: 0 0 10px; }
+.dz-switch { width: 60px; height: 40px; border-radius: 20px; } .dz-switch i { top: 3px; left: 3px; width: 34px; height: 34px; } .dz-switch.on i { transform: translateX(20px); }
+@media (max-width: 400px) { #tab-duo .card.dz-card, #tab-duo .card.dz-status { padding: 14px; } .dz-stats b { font-size: 20px; } }
+/* tap targets >= 40px without changing the look: bigger hit area for store links, hit chips and the Apple page link */
+#tab-duo .dz-sn { padding: 10px 0; margin: -10px 0 -6px; }
+#tab-duo .dz-hit { min-height: 40px; }
+#tab-duo .zt-card a, #tab-duo .dz-wrap a.dz { min-height: 40px; }
+.zt-nm small { display: block; margin-top: 1px; }
+#duo-set-msg:empty { display: none; }
+#duo-out td a:not(.dz), #duo-out th a { display: inline-block; padding: 6px 0; min-height: 40px; box-sizing: border-box; }
