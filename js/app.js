@@ -1797,7 +1797,7 @@
       if (!state.flip) state.flip = await api('/api/flip');
       if (!localStorage.getItem('rd-seen')) localStorage.setItem('rd-seen', new Date().toISOString());
       renderFlip(); renderBadge(); renderV2();
-      if (state.tab === 'duo') duoRenderStatus(); if (state.tab === 'ps5') ps5Render();
+      if (state.tab === 'duo') { duoRenderStatus(); duoRenderTrend(); } if (state.tab === 'ps5') ps5Render();
       if (CFG && !favsLoaded) loadFavs();
     } catch (err) {
       if (/Access key/.test(err.message)) {
@@ -1845,6 +1845,30 @@
   }
   const wInfo = () => { const a = duo.watcher, b = state.status && state.status.duo_watch; return (a && b) ? ((a.last_pass_ts || 0) >= (b.last_pass_ts || 0) ? a : b) : (a || b || null); };
 
+  // Oct 27: tap-to-copy ZIP (store rows, table, last-drop and trending cards). Toast 'Copied 08648'; iOS Safari falls back to select + execCommand.
+  const ZIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+  const zipBtn = (z) => { z = String(z || '').replace(/\D/g, '').slice(0, 5); return z ? `<button type="button" class="zipbtn" data-zip="${z}" aria-label="Copy ZIP code ${z}" title="Tap to copy ${z}">${z}${ZIP_ICON}</button>` : ''; };
+  function legacyCopy(t) {
+    const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.setAttribute('aria-hidden', 'true');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); try { ta.setSelectionRange(0, t.length); } catch (e) { /* ignore */ }
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta); return ok;
+  }
+  function copyZip(z) {
+    const done = () => toast('Copied ' + z), fail = () => toast('ZIP ' + z + ' (press and hold to copy)');
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(z).then(done, () => (legacyCopy(z) ? done() : fail()));
+    else legacyCopy(z) ? done() : fail();
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('[data-zip]'); if (b) { e.preventDefault(); copyZip(b.getAttribute('data-zip')); } });
+  function duoRenderTrend() {
+    const el = $('#duo-trend'); if (!el) return;
+    const inv = (state.status && state.status.duo_inventory) || {}, h = inv.last_nj_hit, tr = inv.trending || [];
+    if (!state.status || !state.status.duo_inventory) { el.innerHTML = ''; return; }
+    const hit = h ? `<p class="dz-k">Last NJ drop</p><b class="zt-n">${esc(h.store)}</b><div class="zt-s">${esc(h.city)}, ${esc(h.state || 'NJ')}</div>${zipBtn(h.zip)}<div class="zt-m">${esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo')}${h.pickup ? ' · ' + esc(h.pickup) : ''}</div><div class="zt-s">${esc(h.time_et)}</div>${apple(h.link) ? `<div style="margin-top:6px"><a href="${esc(apple(h.link))}" target="_blank" rel="noopener noreferrer">Open Apple page ↗</a></div>` : ''}` : '<p class="dz-k">Last NJ drop</p><p class="d">No NJ drop on record yet.</p>';
+    const list = tr.length ? `<ol class="zt-list">${tr.map((t, i) => `<li><span class="zt-rk">${i + 1}</span><div class="zt-nm">${esc(t.name)} <small>${esc(t.city)}, ${esc(t.state || 'NJ')}</small></div><div class="zt-cnt">${esc(t.drops)}<small>${t.drops === 1 ? 'drop' : 'drops'}</small></div><div class="zt-d">Last drop <b>${esc(t.last_drop_et)}</b><br>Usually <b>${esc(t.window)}</b>${t.days > 1 ? ' · on ' + esc(t.days) + ' days' : ''}<br>${esc((t.models || []).join(' · '))}</div><div class="zt-z">${zipBtn(t.zip)}</div></li>`).join('')}</ol><p class="hint">Ranked by distinct drops: a store going from no stock to stock for a model counts once; repeats within 15 minutes merge. Built from the watcher’s verified alerts (history in iphoneduo/drop_history.json). NJ only here; NY/PA/DE drops are kept in the file.</p>` : '<p class="d">No NJ drops recorded yet.</p>';
+    el.innerHTML = `<div class="card zt-card">${hit}</div><div class="card zt-card"><p class="dz-k">Trending drops · NJ</p>${list}</div>`;
+  }
   function duoRenderStatus() {
     const el = $('#duo-status'); if (!el) return;
     const w = wInfo(), sel = duoSel(), n = sel.parts.size, paused = duoPaused() || (w && w.paused);
@@ -1881,7 +1905,7 @@
     const watching = rows.filter((s) => !dropped.has(s.id)).length;
     el.innerHTML = `<p class="dz-k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></svg>${rows.length} nearest Apple stores</p>
       ${rows.map((s) => { const off = dropped.has(s.id), link = apple(s.link), chips = off ? '' : duoHitChips(s, sel);
-        return `<div class="dz-srow ${off ? 'off' : ''} ${chips ? 'hit' : ''}"><div class="grow"><a class="dz-sn" ${link ? `href="${esc(link)}" target="_blank" rel="noopener noreferrer"` : ''}>${esc(s.name)}</a><small>${esc(s.city)}, ${esc(s.state)} ${esc(s.zip)}${s.dist != null ? ` · ${s.dist.toFixed(2)} mi` : ''}${off ? ' · not alerting' : ''}</small>${chips ? `<div class="dz-hits">${chips}</div>` : ''}</div>
+        return `<div class="dz-srow ${off ? 'off' : ''} ${chips ? 'hit' : ''}"><div class="grow"><a class="dz-sn" ${link ? `href="${esc(link)}" target="_blank" rel="noopener noreferrer"` : ''}>${esc(s.name)}</a><small>${esc(s.city)}, ${esc(s.state)}${s.dist != null ? ` · ${s.dist.toFixed(2)} mi` : ''}${off ? ' · not alerting' : ''}</small>${zipBtn(s.zip)}${chips ? `<div class="dz-hits">${chips}</div>` : ''}</div>
           <button type="button" class="dz-x" data-drop="${esc(s.id)}" aria-label="${off ? 'Alert for' : 'Stop alerting for'} Apple ${esc(s.name)}" title="${off ? 'Add back' : 'Drop this store'}">${off ? '+' : '×'}</button></div>`; }).join('')}
       <p class="hint">${watching} of ${rows.length} alert. The box watches all ${(wInfo() || {}).stores || 45} stores in NJ, PA, DE and NY; × only silences a store’s pings. Distances are from Apple.</p>`;
   }
@@ -1901,8 +1925,8 @@
         return `<td class="${sel.parts.has(p.part) ? 'emph' : 'dim'}">${link ? `<a class="dz ${cls} two" href="${esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tip)}" title="${esc(tip)}">${inner}</a>` : `<span class="dz ${cls} two">${inner}</span>`}</td>`; }).join('')}</tr>`;
     const dropped = new Set(duo.prefs.dropped || []);
     const rows = (r.pickup_error ? [] : r.stores || []).map((s) => {
-      const link = apple(s.link), any = parts.some((p) => sel.parts.has(p.part) && s.avail[p.part] === 'available'), name = `<span class="sn">${esc(s.name)}</span><span class="sl">${esc(s.city)}, ${esc(s.state)} ${esc(s.zip)}${s.dist != null ? ` · ${s.dist.toFixed(1)} mi` : ''}</span>`;
-      return `<tr class="${any ? 'hit' : ''}${dropped.has(s.id) ? ' nyrow' : ''}"><th class="store">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Apple ${esc(s.name)} store page">${name}</a>` : name}</th>${parts.map((p) => dzCell(p, s.avail[p.part], 'Apple ' + s.name, sel)).join('')}</tr>`; }).join('');
+      const link = apple(s.link), any = parts.some((p) => sel.parts.has(p.part) && s.avail[p.part] === 'available'), name = `<span class="sn">${esc(s.name)}</span><span class="sl">${esc(s.city)}, ${esc(s.state)}${s.dist != null ? ` · ${s.dist.toFixed(1)} mi` : ''}</span>`;
+      return `<tr class="${any ? 'hit' : ''}${dropped.has(s.id) ? ' nyrow' : ''}"><th class="store">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" title="Apple ${esc(s.name)} store page">${name}</a>` : name}${zipBtn(s.zip)}</th>${parts.map((p) => dzCell(p, s.avail[p.part], 'Apple ' + s.name, sel)).join('')}</tr>`; }).join('');
     return `<div class="dz-wrap card" tabindex="0" role="region" aria-label="iPhone Duo stock table, scroll sideways"><table class="dz-tbl"><thead><tr><th class="store" rowspan="2">Store</th>${th}</tr><tr>${sub}</tr></thead><tbody>${onl}${rows}</tbody></table></div>`;
   }
   function duoRenderOut() {
@@ -1929,7 +1953,7 @@
     });
     sh.addEventListener('click', () => { navigator.share({ title: 'iPhone Duo NJ stock', url: duoShareUrl() }).catch(() => {}); });
   })();
-  const duoRender = () => { duoRenderStatus(); duoRenderWant(); duoRenderStores(); duoRenderOut(); };
+  const duoRender = () => { duoRenderStatus(); duoRenderTrend(); duoRenderWant(); duoRenderStores(); duoRenderOut(); };
   async function duoRun(force) {
     const zip = ($('#duo-zip').value || '').trim(), msg = $('#duo-msg');
     if (!/^\d{5}$/.test(zip)) { msg.className = 'msg err'; msg.textContent = 'Enter a 5-digit ZIP code.'; $('#duo-zip').focus(); return; }

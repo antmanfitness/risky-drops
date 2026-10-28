@@ -41,6 +41,19 @@ tr.any td.store b { color:var(--live); }
 .sw.w { background:#f4f1ea; } .sw.n { background:#1b2a4a; }
 .foot { color:var(--faint); font-size:12.5px; margin:6px 2px; }
 .err { color:var(--amber); }
+.zipbtn { display:inline-flex; align-items:center; gap:6px; min-height:44px; min-width:44px; padding:0 12px; margin:4px 0 0; border:1px solid rgba(91,155,255,.55); border-radius:12px; background:rgba(91,155,255,.14); color:var(--text); font:inherit; font-weight:800; font-size:16px; letter-spacing:.02em; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; font-variant-numeric:tabular-nums; }
+.zipbtn svg { width:15px; height:15px; flex:none; opacity:.85; } .zipbtn:active { background:rgba(91,155,255,.38); } .zipbtn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+td.store .zipbtn { min-height:40px; font-size:14px; padding:0 9px; margin-top:3px; }
+.trend { list-style:none; margin:0; padding:0; } .trend li { display:grid; grid-template-columns:30px 1fr auto; gap:2px 10px; align-items:start; padding:11px 0; border-top:.5px solid var(--hair); } .trend li:first-child { border-top:0; }
+.trend .rk { grid-row:1 / span 3; width:28px; height:28px; border-radius:50%; background:var(--card2); color:var(--muted); font-weight:800; font-size:13.5px; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+.trend li:nth-child(-n+3) .rk { background:rgba(77,255,154,.18); color:var(--live); }
+.trend .nm { font-weight:800; font-size:16px; min-width:0; overflow-wrap:anywhere; } .trend .ct { color:var(--faint); font-weight:500; font-size:13.5px; }
+.trend .cnt { text-align:right; font-weight:800; color:var(--live); font-size:18px; line-height:1.1; white-space:nowrap; } .trend .cnt small { display:block; color:var(--faint); font-weight:600; font-size:11.5px; }
+.trend .d { grid-column:2 / span 2; color:var(--muted); font-size:13.5px; overflow-wrap:anywhere; } .trend .d b { color:var(--text); font-weight:600; }
+.trend .zrow { grid-column:2 / span 2; }
+.rule { color:var(--faint); font-size:12.5px; margin:8px 0 0; }
+#toast { position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%); max-width:calc(100vw - 32px); background:#eef3ff; color:#0b1426; font-weight:800; padding:11px 18px; border-radius:999px; box-shadow:0 6px 24px rgba(0,0,0,.45); z-index:50; font-size:15px; }
+#toast[hidden] { display:none; }
 @media (max-width: 600px) { table { min-width: 0; font-size: 12.5px; } th, td { padding: 8px 1px; } th.store, td.store { min-width: 92px; max-width: 110px; padding-left: 8px; } td.in small, .vh { display: none; } .card { padding: 12px 10px; } }
 @media (min-width: 700px) { main { padding-top: 24px; } h1 { font-size: 26px; } table { font-size: 15px; } }
 </style>
@@ -54,8 +67,10 @@ tr.any td.store b { color:var(--live); }
     <p class="sum" id="sum"></p>
     <div class="wrap" tabindex="0" role="region" aria-label="iPhone Duo stock by NJ store and model, scroll sideways"><div id="grid"></div></div>
   </div>
+  <div class="card" id="trend"><p class="k">Trending drops · NJ</p><div class="s" style="color:var(--muted)">Loading…</div></div>
   <p class="foot" id="foot">View only. Updates by itself about every 30 seconds.</p>
 </main>
+<div id="toast" role="status" aria-live="polite" hidden></div>
 <script>
 (function () {
   var CFG = {"supabaseUrl": "https://dqkdtbhdtfieskkfcipo.supabase.co", "publishableKey": "sb_publishable_rhvH9s9gf4yRATvUlvcLvw_9fIuAzzt"};
@@ -67,6 +82,23 @@ tr.any td.store b { color:var(--live); }
   var ago = function (s) { if (s == null) return 'unknown'; if (s < 90) return Math.max(0, s) + 's'; if (s < 5400) return Math.round(s / 60) + 'm'; if (s < 172800) return Math.round(s / 3600) + 'h'; return Math.round(s / 86400) + 'd'; };
   var SIZES = ['256GB', '512GB', '1TB', '2TB'], COLORS = ['Star White', 'Night Sky'];
   var last = null, lastOk = 0, skew = 0;
+  var ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+  var zipBtn = function (z) { z = String(z || '').replace(/[^0-9]/g, '').slice(0, 5); return z ? '<button type="button" class="zipbtn" data-zip="' + z + '" aria-label="Copy ZIP code ' + z + '" title="Tap to copy ' + z + '">' + z + ICON + '</button>' : ''; };
+  var toastT = 0;
+  function toast(t) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 2200); }
+  function legacyCopy(t) {   // iOS Safari / older browsers: select the text in a real input and execCommand('copy')
+    var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.setAttribute('aria-hidden', 'true');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); try { ta.setSelectionRange(0, t.length); } catch (e) { /* ignore */ }
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta); return ok;
+  }
+  function copyZip(z) {
+    var done = function () { toast('Copied ' + z); }, fail = function () { toast('ZIP ' + z + ' (press and hold to copy)'); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(z).then(done, function () { legacyCopy(z) ? done() : fail(); });
+    else legacyCopy(z) ? done() : fail();
+  }
+  document.addEventListener('click', function (e) { var b = e.target.closest ? e.target.closest('[data-zip]') : null; if (b) { e.preventDefault(); copyZip(b.getAttribute('data-zip')); } });
 
   function render(r) {
     var d = r.duo || {}, now = Math.round(Date.now() / 1000), srv = r.server_ts || now;
@@ -79,7 +111,7 @@ tr.any td.store b { color:var(--live); }
 
     var h = d.last_nj_hit;
     $('hit').innerHTML = '<p class="k">Last NJ drop</p>' + (h
-      ? '<b>' + esc(h.store) + '</b><div class="s">' + esc(h.city) + ', ' + esc(h.state || 'NJ') + ' ' + esc(h.zip) + '</div><div class="m">' + esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo') + (h.pickup ? ' · ' + esc(h.pickup) : '') + '</div><div class="s">' + esc(h.time_et) + '</div>' + (apple(h.link) ? '<div style="margin-top:6px"><a href="' + esc(apple(h.link)) + '" target="_blank" rel="noopener noreferrer">Open Apple page ↗</a></div>' : '')
+      ? '<b>' + esc(h.store) + '</b><div class="s">' + esc(h.city) + ', ' + esc(h.state || 'NJ') + '</div><div>' + zipBtn(h.zip) + '</div><div class="m">' + esc(((h.gb || '') + ' ' + (h.color || '')).trim() || 'iPhone Duo') + (h.pickup ? ' · ' + esc(h.pickup) : '') + '</div><div class="s">' + esc(h.time_et) + '</div>' + (apple(h.link) ? '<div style="margin-top:6px"><a href="' + esc(apple(h.link)) + '" target="_blank" rel="noopener noreferrer">Open Apple page ↗</a></div>' : '')
       : '<div class="s">No NJ drop on record yet.</div>');
 
     var parts = d.parts || [], by = {}; parts.forEach(function (p) { by[p.gb + '|' + p.color] = p.part; });
@@ -93,7 +125,7 @@ tr.any td.store b { color:var(--live); }
         var it = have[by[z + '|' + c]];
         return it ? '<td class="in" title="' + esc(z + ' ' + c) + ' in stock for pickup">' + (apple(it.link) ? '<a href="' + esc(apple(it.link)) + '" target="_blank" rel="noopener noreferrer" style="color:inherit">✓</a>' : '✓') + (it.pickup ? '<small>' + esc(it.pickup) + '</small>' : '') + '</td>' : '<td class="no">·</td>';
       }).join(''); }).join('');
-      return '<tr class="' + (any ? 'any' : '') + '"><td class="store"><b>' + esc(s.name) + '</b><small>' + esc(s.city) + ' ' + esc(s.zip) + '</small></td>' + cells + '</tr>';
+      return '<tr class="' + (any ? 'any' : '') + '"><td class="store"><b>' + esc(s.name) + '</b><small>' + esc(s.city) + '</small>' + zipBtn(s.zip) + '</td>' + cells + '</tr>';
     }).join('');
     var on = d.online || {};
     var onl = '<tr><td class="store"><b>Apple.com online</b><small>ships</small></td>' + SIZES.map(function (z) { return COLORS.map(function (c) {
@@ -103,6 +135,11 @@ tr.any td.store b { color:var(--live); }
     $('sum').className = 'sum' + (n ? ' hot' : '');
     $('sum').textContent = n ? n + ' pickup ' + (n === 1 ? 'listing' : 'listings') + ' in stock in NJ right now' : 'Nothing in stock for pickup at NJ stores right now.';
     $('grid').innerHTML = '<table class="tbl"><thead><tr><th class="store" rowspan="2">Store</th>' + th + '</tr><tr>' + sub + '</tr></thead><tbody>' + rows + onl + '</tbody></table>';
+    var tr = d.trending || [];
+    $('trend').innerHTML = '<p class="k">Trending drops · NJ</p>' + (tr.length ? '<ol class="trend">' + tr.map(function (t, i) {
+      return '<li><span class="rk" aria-label="Rank ' + (i + 1) + '">' + (i + 1) + '</span><div class="nm">' + esc(t.name) + ' <span class="ct">' + esc(t.city) + ', ' + esc(t.state || 'NJ') + '</span></div><div class="cnt">' + esc(t.drops) + '<small>' + (t.drops === 1 ? 'drop' : 'drops') + '</small></div>'
+        + '<div class="d">Last drop <b>' + esc(t.last_drop_et) + '</b><br>Usually <b>' + esc(t.window) + '</b>' + (t.days > 1 ? ' · on ' + esc(t.days) + ' days' : '') + '<br>' + esc((t.models || []).join(' · ')) + '</div><div class="zrow">' + zipBtn(t.zip) + '</div></li>';
+    }).join('') + '</ol><p class="rule">Ranked by distinct drops: a store going from no stock to stock for a model counts once; repeats within 15 minutes are merged. From verified-live watcher alerts only.</p>' : '<div class="s" style="color:var(--muted)">No NJ drops recorded yet.</div>');
     $('foot').className = 'foot';
     $('foot').textContent = 'View only · updated ' + fmt.format(new Date()) + ' ET · refreshes by itself every 30s' + (d.generated_et ? ' · data from ' + d.generated_et : '');
   }
