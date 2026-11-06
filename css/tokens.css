@@ -1,4 +1,4 @@
-/* Risky Drops tokens. Six themes, picked in More > Appearance and saved per device (localStorage 'rd-theme2').
+/* Risky Drops tokens. Six themes, picked in Settings > Appearance and saved per device (localStorage 'rd-theme2').
    Default = Deep Navy. Contrast (WCAG): text on card >= 15:1, muted on card >= 7:1, accent on card >= 6:1, white on --accent-btn >= 4.5:1.
    Every colour in the app comes from these tokens, so a theme is just one block here. data-theme values: navy graphite purple ember light classic. */
 :root, [data-theme="navy"] { /* Deep Navy + electric blue */

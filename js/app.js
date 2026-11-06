@@ -658,18 +658,53 @@
   }
   $('#fee').addEventListener('input', renderFlip);
 
-  // ---------- settings
-  // Themes: six looks, saved per device. The same ids live in tokens.css and the <head> script in index.html.
+  // ---------- settings / appearance (per device, localStorage rd-* keys)
+  // Themes: six looks. Same ids live in tokens.css and the <head> script in index.html.
   const THEMES = { navy: '#070d1a', graphite: '#0b0e0d', purple: '#0c0717', ember: '#080605', light: '#f2f5fa', classic: '#030404' };
+  const lsGet = (k, fb) => { try { return localStorage.getItem(k) || fb; } catch (e) { return fb; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode: just won't persist */ } };
+  const markSeg = (id, v) => document.querySelectorAll('#' + id + ' [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
   function applyTheme(t, save = true) {
     if (!THEMES[t]) t = 'navy';
-    if (save) { try { localStorage.setItem('rd-theme2', t); } catch (e) { /* private mode: theme just won't persist */ } }
+    if (save) lsSet('rd-theme2', t);
     document.documentElement.dataset.theme = t;
-    document.querySelector('meta[name=theme-color]').content = THEMES[t];
+    const meta = document.querySelector('meta[name=theme-color]'); if (meta) meta.content = THEMES[t];
     document.querySelectorAll('#theme-grid [data-theme-pick]').forEach((b) => { const on = b.dataset.themePick === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
   }
-  $('#theme-grid').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-pick]'); if (b) applyTheme(b.dataset.themePick); });
-  { let cur = 'navy'; try { cur = localStorage.getItem('rd-theme2') || 'navy'; } catch (e) { /* ignore */ } applyTheme(cur, false); }
+  function applySkin(v, save = true) {
+    if (v !== 'solid' && v !== 'glass') v = 'glass';
+    if (save) lsSet('rd-skin', v);
+    document.documentElement.dataset.skin = v;
+    markSeg('ap-skin', v);
+  }
+  function applyDensity(v, save = true) {
+    if (v !== 'compact' && v !== 'comfy') v = 'comfy';
+    if (save) lsSet('rd-density', v);
+    document.documentElement.dataset.density = v;
+    markSeg('ap-density', v);
+  }
+  function applyTextSize(v, save = true) {
+    if (v !== 'large' && v !== 'default') v = 'default';
+    if (save) lsSet('rd-text', v);
+    document.documentElement.dataset.text = v;
+    markSeg('ap-text', v);
+  }
+  function applyMotion(on, save = true) {
+    const v = on ? 'reduce' : 'full';
+    if (save) lsSet('rd-motion', v);
+    document.documentElement.dataset.motion = v;
+    const sw = $('#ap-motion'); if (sw) { sw.classList.toggle('on', !!on); sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  }
+  if ($('#theme-grid')) $('#theme-grid').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-pick]'); if (b) applyTheme(b.dataset.themePick); });
+  if ($('#ap-skin')) $('#ap-skin').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) applySkin(b.dataset.v); });
+  if ($('#ap-density')) $('#ap-density').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) applyDensity(b.dataset.v); });
+  if ($('#ap-text')) $('#ap-text').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) applyTextSize(b.dataset.v); });
+  if ($('#ap-motion')) $('#ap-motion').addEventListener('click', () => applyMotion($('#ap-motion').getAttribute('aria-checked') !== 'true'));
+  applyTheme(lsGet('rd-theme2', 'navy'), false);
+  applySkin(lsGet('rd-skin', 'glass'), false);
+  applyDensity(lsGet('rd-density', 'comfy'), false);
+  applyTextSize(lsGet('rd-text', 'default'), false);
+  applyMotion(lsGet('rd-motion', 'full') === 'reduce', false);
   $('#test-btn').addEventListener('click', async (e) => {
     const b = e.currentTarget, m = $('#test-msg'); b.disabled = true; m.className = 'msg'; m.textContent = 'Sending…';
     try { await api('/api/test-notify', {}); m.className = 'msg ok'; m.textContent = 'Sent. Check the ntfy app on your iPhone.'; load(); }
