@@ -112,7 +112,7 @@
   // Dock: Home / Watches / Sales / More. Duo and PS5 Pro are watch details (not bottom tabs). Pickup lives under More.
   // Items, Friends, Settings, Pickup and Ask keep their own screens; the dock highlights More while you are on one of them.
   const MORE_SET = ['more', 'phones', 'people', 'friends', 'settings', 'ask'];
-  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
+  const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'], tracking: ['sales', 'track'] };
   const RICH_WATCH = { duo: 'duo', ps5: 'ps5', ps5wm: 'ps5' };
   const dockFor = (tab) => (tab === 'duo' || tab === 'ps5') ? 'watches' : tab;
   const watchHash = (tab) => tab === 'phones' ? 'items' : tab === 'duo' ? 'watches/w/duo' : tab === 'ps5' ? 'watches/w/ps5' : tab;
@@ -131,7 +131,7 @@
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + watchHash(tab) + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
     if (sub && tab === 'sales') showSub('s', sub);
-    if (tab === 'sales' && typeof renderTracker === 'function' && ext.loaded) setTimeout(renderTracker, 0);
+    if (tab === 'sales' && typeof renderTrack === 'function') setTimeout(renderTrack, 0);
     if (tab === 'phones' || tab === 'home') loadPhones().catch(() => {});
     if (tab === 'friends' && typeof loadFriendsView === 'function') { if (sub === undefined) frDetail = null; loadFriendsView().catch((e) => toast(e.message)); }
     if (typeof closeSheet === 'function') closeSheet();
@@ -141,8 +141,8 @@
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
   $('#gear').addEventListener('click', () => show('settings'));
   // More menu: every row opens its screen; Favorites lives inside Watches.
-  document.querySelectorAll('.more-row').forEach((b) => b.addEventListener('click', () => { const g = b.dataset.go; if (g === 'favs') show('watches', 'favs'); else show(g); if (g === 'ask') loadAsk().catch(() => {}); }));
-  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns'], s: ['listings', 'sold', 'comps'] };
+  document.querySelectorAll('.more-row').forEach((b) => b.addEventListener('click', () => { const g = b.dataset.go; if (g === 'favs') show('watches', 'favs'); else if (g && g.includes('/')) { const [t, sub] = g.split('/'); show(t, sub); } else show(g); if (g === 'ask') loadAsk().catch(() => {}); }));
+  const SUBS = { w: ['list', 'favs', 'alerts', 'countdowns'], s: ['listings', 'sold', 'track', 'comps'] };
   function showSub(g, v) {
     if (!SUBS[g].includes(v)) return; state[g + 'sub'] = v;
     document.querySelectorAll(`#${g}-seg button`).forEach((b) => b.classList.toggle('on', b.dataset.v === v));
@@ -246,6 +246,7 @@
         ${CFG ? `<div class="client-menu wmenu"><button type="button" class="client-menu-trigger" aria-label="More actions for ${esc(i.name)}" aria-haspopup="menu" aria-expanded="${wMenu === i.id}" data-wmenu="${esc(i.id)}">⋯</button>
         ${wMenu === i.id ? `<div class="client-menu-pop" role="menu"><button type="button" role="menuitem" data-wfav="${esc(i.id)}">${favd ? '★ In favorites' : '☆ Add to favorites'}</button><button type="button" role="menuitem" data-wdiag="${esc(i.id)}">Diagnose</button><button type="button" role="menuitem" class="danger" data-wdel="${esc(i.id)}">Delete watch</button></div>` : ''}</div>` : ''}</div>
       <p class="d">${esc(i.sub)}</p>
+      ${typeof watchInvHtml === 'function' ? watchInvHtml(i) : ''}
       ${blockLine}
       ${storesHtml(i)}
       ${i.extra ? `<p class="f">${esc(i.extra)}</p>` : ''}
@@ -627,7 +628,7 @@
         ${a.detail ? `<p class="d">${esc(a.detail)}</p>` : ''}
         <p class="f">${esc(a.time_et || et(a.ts))}${a.backfilled ? ' · from watcher log' : ''}${a.muted ? ' · quiet, not pushed' : a.pushed === false ? ' · push failed' : ''}</p>
         ${CFG ? soldLine(a) : ''}
-        <div class="actions">${link ? (BUYNOW.has(a.source) ? `<a class="btn buy buynow" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${a.kind === 'test' ? 'Buy now (test) ↗' : 'Buy now ↗'}</a>` : `<a class="btn buy" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>`) : ''}${CFG && a.id && a.kind !== 'test' ? `<button class="btn" data-sold="${esc(a.id)}">${saleFor(a.id) || listingFor(a.id) ? 'Edit sale' : 'Mark as sold'}</button>` : ''}</div>
+        <div class="actions">${(typeof alertBuys === 'function' ? alertBuys(a) : (link ? [{ href: link, label: BUYNOW.has(a.source) ? (a.kind === 'test' ? 'Buy now (test) ↗' : 'Buy now ↗') : 'Buy ↗' }] : [])).map((b, i) => `<a class="btn ${i === 0 ? 'buy' : ''} ${BUYNOW.has(a.source) && i === 0 ? 'buynow' : ''}" href="${esc(b.href)}" target="_blank" rel="noopener noreferrer">${esc(b.label)}</a>`).join('')}${CFG && a.id && a.kind === 'restock' ? `<button class="btn" data-bought="${esc(a.id)}">Mark bought</button>` : ''}${CFG && a.id && a.kind !== 'test' ? `<button class="btn" data-sold="${esc(a.id)}">${saleFor(a.id) || listingFor(a.id) ? 'Edit sale' : 'Mark as sold'}</button>` : ''}</div>
       </div>`;
     }).join('') || '<p class="empty">No alerts yet.</p>';
   }
@@ -863,6 +864,7 @@
     if (!CFG || !KEY) return;
     const d = await rpc('rd_app_data', { p_key: KEY });
     Object.assign(ext, d, { loaded: true });
+    if (typeof pullTracks === 'function') await pullTracks();
   }
   const refreshExt = async () => { try { await loadExt(); renderV2(); } catch (e) { toast('Could not load: ' + e.message); } };
 
@@ -930,12 +932,13 @@
         <div class="mgrid"><div><small>List price${q > 1 ? ' / unit' : ''}</small><b>${money(+l.price)}</b></div><div><small>Fee</small><b>−${money(r.fee)}</b></div><div><small>Shipping</small><b>${+l.shipping ? '−' + money(+l.shipping) : money(0)}</b></div>
           <div><small>Net payout</small><b>${money(r.net)}</b></div><div><small>Cost${q > 1 ? ' / unit' : ' paid'}</small><b>${money(unitCost(l))}</b></div><div class="big"><small>Profit${q > 1 ? ' / unit' : ''}</small><b class="${cls(r.profit)}">${money(r.profit)}</b></div></div>
         ${sold.length ? `<p class="sold-line">Sold ${l.units_sold} so far · profit <span class="${cls(soldProfit)}">${money(soldProfit)}</span></p>` : ''}
+        ${listWatch[l.id] ? `<p class="f">Linked watch: ${esc(((state.status && state.status.items) || []).find((i) => i.id === listWatch[l.id])?.name || listWatch[l.id])}</p>` : ''}
         ${l.notes ? `<p class="f">${esc(l.notes)}</p>` : ''}
         ${priceLine(priceRow('listing', l.id), +l.cost)}
         <div class="actions"><button class="btn buy" data-lsold="${l.id}">Record sale</button><button class="btn" data-ledit="${l.id}">Edit</button><button class="btn ghost danger" data-ldel="${l.id}">Delete</button></div>
       </div>`;
     }).join('') || `<p class="empty">${ext.listings.length ? 'Nothing left in stock. Sold ones are under Sold.' : 'No listings yet. Tap + New listing.'}</p>`;
-    renderSold();
+    renderSold(); if (typeof renderTrack === 'function') renderTrack();
   }
   // Sold history: each unit sale from a listing + alerts marked sold
   function renderSold() {
@@ -944,11 +947,152 @@
       return `<div class="card"><div class="row"><p class="t grow">${esc(r.item)}</p><span class="pill sold">${r.alert_id ? 'From alert' : 'Listing'}</span></div>
         <p class="d">${r.kind === 'unit' && (r.units > 1 || qtyOf(L) > 1) ? `${r.units} × ${money(r.unit_price)} · ` : ''}${esc(platName(r))} · fee ${esc(pct(+r.fee_pct))}% · sold ${esc(et(r.when))}${L && qtyOf(L) > 1 ? ` · ${leftOf(L) ? leftOf(L) + ' of ' + qtyOf(L) + ' left' : 'sold out'}` : ''}${r.serial ? ' · SN ' + esc(r.serial) : ''}</p>
         <div class="mgrid"><div><small>Sale</small><b>${money(+r.price)}</b></div><div><small>Fees + ship</small><b>−${money(r2(m.fee + +r.shipping))}</b></div><div class="big"><small>Profit</small><b class="${cls(m.profit)}">${money(m.profit)}</b></div></div>
-        <div class="actions"><button class="btn" data-sedit="${r.kind}:${r.kind === 'sale' ? r.alert_id || '' : r.id}">Edit</button></div></div>`; }).join('') || '<p class="empty">No sales yet. Tap Record sale on a listing, or “Mark as sold” on an alert.</p>';
+        ${typeof shipCkHtml === 'function' ? shipCkHtml(saleKey(r), r.item) : ''}
+        <div class="actions"><button class="btn" data-sedit="${r.kind}:${r.kind === 'sale' ? r.alert_id || '' : r.id}">Edit</button><button class="btn" data-track="${esc(saleKey(r))}" data-titem="${esc(r.item)}">${trackOf(saleKey(r)) && trackOf(saleKey(r)).tracking ? 'Edit tracking' : 'Add tracking'}</button></div></div>`; }).join('') || '<p class="empty">No sales yet. Tap Record sale on a listing, or “Mark as sold” on an alert.</p>';
   }
-  $('#sold-list').addEventListener('click', (e) => { const b = e.target.closest('[data-sedit]'); if (!b) return; const [k, id] = b.dataset.sedit.split(':');
+  $('#sold-list').addEventListener('click', (e) => {
+    if (typeof onShipClick === 'function' && onShipClick(e)) return;
+    const b = e.target.closest('[data-sedit]'); if (!b) return; const [k, id] = b.dataset.sedit.split(':');
     if (k === 'unit') { const x = unitSales().find(({ u }) => u.id === +id); if (x) openUnitSale(x.l, x.u); }
     else { const s = ext.sales.find((x) => x.alert_id === id); const a = state.alerts.find((x) => x.id === id) || { id, item: s?.item, ts: s?.sold_at }; openSale(a); } });
+  // ---------- Tracking (Sales → Tracking). Saved on this device; synced to Supabase when rd_track_save exists.
+  const CARRIER = { usps: 'USPS', ups: 'UPS', fedex: 'FedEx', other: 'Other' };
+  const STLAB = { in_transit: 'In transit', delivered: 'Delivered', exception: 'Exception' };
+  let tracks = {}, listWatch = {};
+  const lsJson = (k, fb) => { try { return JSON.parse(localStorage.getItem(k) || '') || fb; } catch (e) { return fb; } };
+  const lsJsonSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const loadTracks = () => { tracks = lsJson('rd-track', {}); listWatch = lsJson('rd-list-watch', {}); };
+  loadTracks();
+  const saleKey = (r) => (r.kind === 'unit' ? 'unit:' : 'sale:') + (r.kind === 'unit' ? r.id : (r.alert_id || r.id));
+  const trackOf = (key) => tracks[key] || null;
+  function trackUrl(carrier, num) {
+    const n = encodeURIComponent(String(num || '').trim()); if (!n) return '';
+    return carrier === 'usps' ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${n}`
+      : carrier === 'ups' ? `https://www.ups.com/track?tracknum=${n}`
+      : carrier === 'fedex' ? `https://www.fedex.com/fedextrack/?trknbr=${n}`
+      : `https://www.google.com/search?q=${encodeURIComponent('track package ' + num)}`;
+  }
+  function guessCarrier(n) {
+    const t = String(n || '').replace(/\s/g, '').toUpperCase();
+    if (/^1Z[A-Z0-9]{16}$/.test(t)) return 'ups';
+    if (/^(94|93|92|95)\d{18,22}$/.test(t)) return 'usps';
+    if (/^\d{12,15}$/.test(t)) return 'fedex';
+    return 'other';
+  }
+  async function saveTrack(rec) {
+    tracks[rec.key] = rec; lsJsonSet('rd-track', tracks);
+    if (CFG && KEY) { try { await rpc('rd_track_save', { p_key: KEY, p_track: rec }); } catch (e) { /* local until SQL is applied */ } }
+  }
+  async function deleteTrack(key) {
+    delete tracks[key]; lsJsonSet('rd-track', tracks);
+    if (CFG && KEY) { try { await rpc('rd_track_delete', { p_key: KEY, p_track_key: key }); } catch (e) {} }
+  }
+  function shipCkHtml(key, item) {
+    const t = trackOf(key) || {};
+    return `<div class="ship-ck" data-tkey="${esc(key)}" data-titem="${esc(item || '')}">
+      <label><input type="checkbox" data-ck="label_bought" ${t.label_bought ? 'checked' : ''}> Label bought</label>
+      <label><input type="checkbox" data-ck="packing_slip" ${t.packing_slip ? 'checked' : ''}> Packing slip</label>
+      <span class="${t.tracking ? 'done' : 'need'}">${t.tracking ? 'Tracking added' : 'Tracking needed'}</span></div>`;
+  }
+  function onShipClick(e) {
+    const ck = e.target.closest('[data-ck]');
+    if (ck) {
+      const wrap = ck.closest('[data-tkey]'); if (!wrap) return true;
+      const key = wrap.dataset.tkey, prev = trackOf(key) || { key, item: wrap.dataset.titem || '', carrier: 'other', tracking: '', status: 'in_transit', label_bought: false, packing_slip: false };
+      prev[ck.dataset.ck] = ck.checked; prev.updated_at = new Date().toISOString(); saveTrack(prev).then(() => { renderSold(); renderTrack(); });
+      return true;
+    }
+    const b = e.target.closest('[data-track]'); if (b) { openTrack(b.dataset.track, b.dataset.titem); return true; }
+    return false;
+  }
+  let trackCtx = null;
+  function openTrack(key, item) {
+    const t = trackOf(key) || {}; trackCtx = key;
+    const f = $('#track-form'); f.reset();
+    f.carrier.value = t.carrier || 'usps'; f.tracking.value = t.tracking || ''; f.status.value = t.status || 'in_transit';
+    f.label_bought.checked = !!t.label_bought; f.packing_slip.checked = !!t.packing_slip;
+    $('#st-title').textContent = t.tracking ? 'Edit tracking' : 'Add tracking';
+    $('#st-sub').textContent = item || t.item || ''; f.dataset.item = item || t.item || '';
+    $('#st-delete').hidden = !t.tracking && !t.label_bought && !t.packing_slip; $('#st-msg').textContent = '';
+    sheet('#sheet-track');
+  }
+  $('#track-form').tracking.addEventListener('input', (e) => {
+    const f = e.target.form; if (!trackOf(trackCtx) || !trackOf(trackCtx).carrier) { const g = guessCarrier(e.target.value); if (g !== 'other') f.carrier.value = g; }
+  });
+  $('#track-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.currentTarget, msg = $('#st-msg'), num = f.tracking.value.trim();
+    if (num.length < 4) { msg.className = 'msg err'; msg.textContent = 'Enter a tracking number (at least 4 characters).'; return; }
+    msg.className = 'msg'; msg.textContent = 'Saving…';
+    try {
+      await saveTrack({ key: trackCtx, item: f.dataset.item || '', carrier: f.carrier.value, tracking: num, status: f.status.value,
+        label_bought: f.label_bought.checked, packing_slip: f.packing_slip.checked, updated_at: new Date().toISOString() });
+      closeSheet(); toast('Tracking saved'); renderSold(); renderTrack();
+    } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
+  });
+  $('#st-delete').addEventListener('click', async () => {
+    if (!trackCtx) return; if (!(await confirmBox({ title: 'Remove tracking?', body: 'The sale stays. Only the tracking info is cleared.', ok: 'Remove' }))) return;
+    await deleteTrack(trackCtx); closeSheet(); toast('Tracking removed'); renderSold(); renderTrack();
+  });
+  function allSaleRefs() {
+    return [...unitSales().map(usRow), ...ext.sales.map((x) => ({ kind: 'sale', ...x }))].map((r) => ({ key: saleKey(r), item: r.item, when: r.when || r.sold_at }));
+  }
+  function renderTrack() {
+    if (!$('#track-open')) return;
+    const refs = allSaleRefs(), byKey = Object.fromEntries(refs.map((r) => [r.key, r]));
+    const rows = Object.values({ ...Object.fromEntries(refs.filter((r) => trackOf(r.key)).map((r) => [r.key, { ...trackOf(r.key), item: r.item }])), ...tracks });
+    const card = (t) => {
+      const href = t.tracking ? trackUrl(t.carrier, t.tracking) : '';
+      return `<div class="card">
+        <div class="row"><p class="t grow">${esc(t.item || byKey[t.key]?.item || 'Sale')}</p><span class="pill ${t.status === 'delivered' ? 'sold' : 'running'}">${esc(STLAB[t.status] || t.status || 'In transit')}</span></div>
+        <p class="d">${esc(CARRIER[t.carrier] || t.carrier || '—')}${t.tracking ? ' · ' + esc(t.tracking) : ''}</p>
+        ${shipCkHtml(t.key, t.item)}
+        <div class="actions">${href ? `<a class="btn buy" href="${esc(href)}" target="_blank" rel="noopener noreferrer">Track ${esc(CARRIER[t.carrier] || '')} ↗</a>` : ''}<button class="btn" data-track="${esc(t.key)}" data-titem="${esc(t.item || '')}">${t.tracking ? 'Edit' : 'Add tracking'}</button></div></div>`;
+    };
+    const open = rows.filter((t) => t.status !== 'delivered' && (t.tracking || t.label_bought || t.packing_slip));
+    const done = rows.filter((t) => t.status === 'delivered');
+    const need = refs.filter((r) => !trackOf(r.key) || !trackOf(r.key).tracking);
+    $('#track-open').innerHTML = (need.length ? `<p class="kicker">Needs tracking</p>` + need.map((r) => {
+      const t = trackOf(r.key) || { key: r.key, item: r.item, status: 'in_transit' };
+      return card(t);
+    }).join('') : '') + (open.filter((t) => t.tracking).length ? `<p class="kicker">In transit</p>` + open.filter((t) => t.tracking).map(card).join('') : '')
+      || '<p class="empty">No open shipments. Record a sale, then tap Add tracking.</p>';
+    $('#track-done').innerHTML = done.map(card).join('') || '<p class="empty">Nothing marked delivered yet.</p>';
+  }
+  if ($('#s-track')) $('#s-track').addEventListener('click', (e) => { onShipClick(e); });
+  function listingsForWatch(wid) { return (ext.listings || []).filter((l) => String(listWatch[l.id] || '') === String(wid)); }
+  function watchInvHtml(i) {
+    const ls = listingsForWatch(i.id); if (!ls.length) return '';
+    const n = ls.reduce((a, l) => a + (typeof leftOf === 'function' ? leftOf(l) : 0), 0);
+    return `<p class="d">Inventory: <b>${n}</b> unit${n === 1 ? '' : 's'} on hand · ${ls.length} listing${ls.length === 1 ? '' : 's'}</p>`;
+  }
+  function watchIdFromAlert(a) {
+    const src = a.source || '';
+    if ((state.status?.items || []).some((i) => i.id === src)) return src;
+    return ({ iphoneduo: 'duo', ps5wm: 'ps5wm' })[src] || '';
+  }
+  function alertBuys(a) {
+    const out = [], seen = new Set();
+    const add = (href, label) => { const u = safeUrl(href); if (!u || seen.has(u)) return; seen.add(u); out.push({ href: u, label }); };
+    const fake = { detail: a.detail, link: a.link, name: a.item || a.title, sub: a.item || '' };
+    for (const st of parseStores(fake)) if (st.link) add(st.link, `Buy at ${st.name} ↗`);
+    const il = safeUrl(a.link), h = hostOf(il);
+    if (il) {
+      const name = /target\.com/.test(h) ? 'Target' : /walmart\.com/.test(h) ? 'Walmart' : /gamestop\.com/.test(h) ? 'GameStop' : /apple\.com/.test(h) ? 'Apple' : '';
+      add(il, name ? `Buy at ${name} ↗` : (BUYNOW.has(a.source) ? (a.kind === 'test' ? 'Buy now (test) ↗' : 'Buy now ↗') : 'Buy ↗'));
+    }
+    const blob = `${a.store || ''} ${a.detail || ''} ${a.title || ''}`, q = a.item || a.title || '';
+    if (q) [['target', 'Target', (qq) => `https://www.target.com/s?searchTerm=${enc(qq)}`], ['walmart', 'Walmart', (qq) => `https://www.walmart.com/search?q=${enc(qq)}`],
+      ['gamestop', 'GameStop', (qq) => `https://www.gamestop.com/search/?q=${enc(qq)}`], ['apple', 'Apple', (qq) => `https://www.apple.com/us/search/${enc(qq)}`]]
+      .forEach(([rx, name, fn]) => { if (new RegExp(rx, 'i').test(blob) && !out.some((o) => o.label.includes(name))) add(fn(q), `Buy at ${name} ↗`); });
+    return out;
+  }
+  async function pullTracks() {
+    loadTracks();
+    if (!CFG || !KEY) return;
+    try { const d = await rpc('rd_tracks', { p_key: KEY }); if (d && typeof d === 'object' && !Array.isArray(d)) { tracks = { ...tracks, ...d }; lsJsonSet('rd-track', tracks); } } catch (e) {}
+    try { const w = await rpc('rd_listing_watches', { p_key: KEY }); if (w && typeof w === 'object') { listWatch = { ...listWatch, ...w }; lsJsonSet('rd-list-watch', listWatch); } } catch (e) {}
+  }
+
   // ---------- Record a sale of N units from a listing (quantity / inventory)
   let usCtx = null;
   function usaleCalc() {
@@ -956,7 +1100,7 @@
     if (!(n >= 1) || !isFinite(pu)) { $('#su-calc').innerHTML = ''; return; }
     const ship = f.shipping.value.trim() === '' ? 0 : num(f.shipping.value), rev = r2(n * pu), cogs = r2(n * unitCost(L)), r = pnl(rev, num(f.fee_pct.value) || 0, ship || 0, cogs);
     $('#su-calc').innerHTML = `<div class="mgrid"><div><small>Revenue</small><b>${money(rev)}</b></div><div><small>Fee</small><b>−${money(r.fee)}</b></div><div><small>Shipping</small><b>${ship ? '−' + money(ship) : money(0)}</b></div>
-      <div><small>Cost (${n} × ${money(unitCost(L))})</small><b>−${money(cogs)}</b></div><div><small>Margin</small><b class="${cls(r.profit)}">${rev > 0 ? (r.profit / rev * 100).toFixed(1) + '%' : '—'}</b></div><div class="big"><small>Profit</small><b class="${cls(r.profit)}">${money(r.profit)}</b></div></div>`;
+      <div><small>Cost (${n} × ${money(unitCost(L))})</small><b>−${money(cogs)}</b></div><div><small>Margin</small><b class="${cls(r.profit)}">${rev > 0 ? (r.profit / rev * 100).toFixed(1) + '%' : '—'}</b></div><div class="big"><small>Profit</small><b class="${cls(r.profit)}">${money(r.profit)}</b></div></div><p class="hint">Profit after platform fee, outbound shipping, and unit cost (buy price + tax + inbound shipping).</p>`;
   }
   function openUnitSale(L, u) {
     const f = $('#usale-form'); f.reset(); usCtx = { l: L, u: u || null };
@@ -1103,7 +1247,7 @@
   function listingCalc() {
     const f = $('#listing-form'), n = listingNums();
     $('#sl-costsum').innerHTML = isFinite(n.per) ? `Total cost <b>${money(r2(n.basis * n.q))}</b> · <b>${money(r2(n.basis))}</b> per unit${n.tx || n.ins ? ' (incl. tax / inbound shipping)' : ''}` : '';
-    $('#sl-calc').innerHTML = (n.q > 1 ? '<p class="hint">Per unit, at the list price:</p>' : '') + calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), n.basis);
+    $('#sl-calc').innerHTML = (n.q > 1 ? '<p class="hint">Per unit, at the list price:</p>' : '') + calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), n.basis) + '<p class="hint">Auto profit: list price − selling fee − shipping to buyer − cost after tax and inbound shipping.</p>';
   }
   const setCostMode = (m) => { costMode = m; document.querySelectorAll('#sl-costmode button').forEach((b) => b.classList.toggle('on', b.dataset.m === m)); $('#sl-cost-lbl').textContent = m === 'total' ? 'Total paid for all units ($)' : 'Cost per unit ($)'; listingCalc(); };
   $('#sl-costmode').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const f = $('#listing-form'), n = listingNums();
@@ -1114,14 +1258,17 @@
   $('#sale-form').item.addEventListener('input', (e) => { const f = e.target.form; if (!f.item_type.dataset.touched) f.item_type.value = guessType(e.target.value); });
   ['#listing-form', '#sale-form'].forEach((id) => $(id).item_type.addEventListener('change', (e) => { e.target.dataset.touched = '1'; }));
   const tagType = (kind, id, t) => id ? call('rd_set_item_type', { p_kind: kind, p_id: id, p_type: t }).catch((x) => toast('Type not saved: ' + x.message)) : null;
-  function openListing(l, sold) {
+  function openListing(l, sold, seed) {
     if (sold && l) { openUnitSale(l); return; }
     listingEdit = l || null; const f = $('#listing-form'); f.reset(); delete f.item_type.dataset.touched;
     $('#sl-title').textContent = l ? 'Edit listing' : 'New listing';
-    f.item.value = l ? l.item : ''; f.platform.value = l ? l.platform : ''; f.platform_custom.value = l ? (l.platform_custom || '') : '';
+    f.item.value = l ? l.item : (seed && seed.item || ''); f.platform.value = l ? l.platform : ''; f.platform_custom.value = l ? (l.platform_custom || '') : '';
     f.fee_pct.value = l ? pct(+l.fee_pct) : ''; f.cost.value = l ? (+l.cost).toFixed(2) : ''; f.price.value = l ? (+l.price).toFixed(2) : '';
-    f.shipping.value = l && +l.shipping ? (+l.shipping).toFixed(2) : ''; f.notes.value = l ? (l.notes || '') : '';
-    f.qty.value = l ? qtyOf(l) : '1'; f.tax_pct.value = l && +l.tax_pct ? pct(+l.tax_pct) : ''; f.in_ship.value = l && +l.in_ship ? (+l.in_ship).toFixed(2) : ''; setCostMode('unit');
+    f.shipping.value = l && +l.shipping ? (+l.shipping).toFixed(2) : ''; f.notes.value = l ? (l.notes || '') : (seed && seed.notes || '');
+    f.qty.value = l ? qtyOf(l) : '1'; f.tax_pct.value = l && +l.tax_pct ? pct(+l.tax_pct) : (l ? '' : '6.625'); f.in_ship.value = l && +l.in_ship ? (+l.in_ship).toFixed(2) : ''; setCostMode('unit');
+    if (f.watch_id) { const items = (state.status && state.status.items) || [];
+      f.watch_id.innerHTML = '<option value="">None</option>' + items.map((i) => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('');
+      f.watch_id.value = l ? (listWatch[l.id] || '') : (seed && seed.watch_id || ''); }
     $('#sl-qtyhint').textContent = l && l.units_sold ? `${l.units_sold} sold so far, so quantity can’t go below ${l.units_sold}.` : 'Each unit can be sold separately. Default 1.';
     f.item_type.value = l ? typeOfSale(l) : 'other';
     setStatus(sold ? 'sold' : l ? l.status : 'active');
@@ -1153,6 +1300,10 @@
     try {
       const l = listingEdit ? await call('rd_listing_update', { p_id: listingEdit.id, p_listing: body }) : await call('rd_listing_add', { p_listing: body });
       await tagType('listing', l.id, f.item_type.value);
+      if (f.watch_id) {
+        const wid = f.watch_id.value; if (wid) listWatch[l.id] = wid; else delete listWatch[l.id]; lsJsonSet('rd-list-watch', listWatch);
+        if (CFG && KEY) { try { await rpc('rd_listing_watch_set', { p_key: KEY, p_listing_id: l.id, p_watch_id: wid || '' }); } catch (e) {} }
+      }
       const prev = priceRow('listing', l.id);
       if (f.drop_alert.checked || prev) await call('rd_price_watch_save', { p_kind: 'listing', p_ref: String(l.id), p_cfg: { buy_in: unitCost(l), alert_on: f.drop_alert.checked, label: l.item, site: platName(l), member_id: me()?.id ?? null } });
       closeSheet(); toast(listingEdit ? 'Listing updated' : 'Listing added'); await refreshExt();
@@ -1195,7 +1346,7 @@
     else { f.fee_pct.value = ''; hint.textContent = 'Pick a platform. Platforms set individual rates, so enter this sale’s fee %.'; }
   }
   const saleCost = () => { const f = $('#sale-form'); return saleCtx?.listing && f.use_listing.checked ? unitCost(saleCtx.listing) : num(f.cost.value); };
-  function saleCalc() { const f = $('#sale-form'); $('#ss-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), saleCost()); }
+  function saleCalc() { const f = $('#sale-form'); $('#ss-calc').innerHTML = calcHtml(num(f.price.value), num(f.fee_pct.value), num(f.shipping.value), saleCost()) + '<p class="hint">Profit after platform fee, outbound shipping, and your buy cost (tax and inbound shipping when the listing has them).</p>'; }
   const linkToggle = () => { const f = $('#sale-form'), on = !!(saleCtx.listing && f.use_listing.checked); $('#ss-cost-wrap').hidden = on; saleCalc(); };
   function openSale(a) {
     const us = unitSaleFor(a.id); if (us) { openUnitSale(us.l, us.u); return; }   // already recorded as a unit sale of a listing
@@ -1229,7 +1380,11 @@
     if (!saleCtx?.sale || !confirm('Remove this sale? The alert stays.')) return;
     try { await call('rd_sale_delete', { p_id: saleCtx.sale.id }); closeSheet(); toast('Sale removed'); await refreshExt(); } catch (err) { $('#ss-msg').textContent = err.message; }
   });
-  $('#alert-list').addEventListener('click', (e) => { const b = e.target.closest('button[data-sold]'); if (!b) return; const a = state.alerts.find((x) => x.id === b.dataset.sold); if (a) { try { need(); openSale(a); } catch (err) { toast(err.message); } } });
+  $('#alert-list').addEventListener('click', (e) => {
+    const bought = e.target.closest('[data-bought]');
+    if (bought) { const a = state.alerts.find((x) => x.id === bought.dataset.bought); if (!a) return;
+      try { need(); openListing(null, false, { item: a.item || a.title || '', notes: `Bought at ${[a.store, a.city].filter(Boolean).join(', ') || 'restock'} · ${a.time_et || et(a.ts)}`, watch_id: watchIdFromAlert(a) }); } catch (err) { toast(err.message); } return; }
+    const b = e.target.closest('button[data-sold]'); if (!b) return; const a = state.alerts.find((x) => x.id === b.dataset.sold); if (a) { try { need(); openSale(a); } catch (err) { toast(err.message); } } });
   const soldLine = (a) => { const us = a.id && unitSaleFor(a.id), s = us ? usRow(us) : a.id && (saleFor(a.id) || listingFor(a.id)); if (!s) return ''; const r = pnl(+s.price, +s.fee_pct, +s.shipping, +s.cost);
     return `<p class="sold-line">Sold ${money(+s.price)} on ${esc(platName(s))}, profit <span class="${cls(r.profit)}">${money(r.profit)}</span></p>`; };
 
