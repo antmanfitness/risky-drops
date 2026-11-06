@@ -131,6 +131,7 @@
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + watchHash(tab) + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
     if (sub && tab === 'sales') showSub('s', sub);
+    if (tab === 'sales' && typeof renderTracker === 'function' && ext.loaded) setTimeout(renderTracker, 0);
     if (tab === 'sales' && typeof renderTrack === 'function') setTimeout(renderTrack, 0);
     if (tab === 'phones' || tab === 'home') loadPhones().catch(() => {});
     if (tab === 'friends' && typeof loadFriendsView === 'function') { if (sub === undefined) frDetail = null; loadFriendsView().catch((e) => toast(e.message)); }
