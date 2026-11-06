@@ -663,7 +663,7 @@
   const THEMES = { navy: '#070d1a', graphite: '#0b0e0d', purple: '#0c0717', ember: '#080605', light: '#f2f5fa', classic: '#030404' };
   const lsGet = (k, fb) => { try { return localStorage.getItem(k) || fb; } catch (e) { return fb; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode: just won't persist */ } };
-  const markSeg = (id, v) => document.querySelectorAll('#' + id + ' [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+  const setSwitch = (el, on) => { if (!el) return; el.classList.toggle('on', !!on); el.setAttribute('aria-checked', on ? 'true' : 'false'); };
   function applyTheme(t, save = true) {
     if (!THEMES[t]) t = 'navy';
     if (save) lsSet('rd-theme2', t);
@@ -675,30 +675,30 @@
     if (v !== 'solid' && v !== 'glass') v = 'glass';
     if (save) lsSet('rd-skin', v);
     document.documentElement.dataset.skin = v;
-    markSeg('ap-skin', v);
+    setSwitch($('#ap-skin'), v === 'glass');
   }
   function applyDensity(v, save = true) {
     if (v !== 'compact' && v !== 'comfy') v = 'comfy';
     if (save) lsSet('rd-density', v);
     document.documentElement.dataset.density = v;
-    markSeg('ap-density', v);
+    setSwitch($('#ap-density'), v === 'compact');
   }
   function applyTextSize(v, save = true) {
     if (v !== 'large' && v !== 'default') v = 'default';
     if (save) lsSet('rd-text', v);
     document.documentElement.dataset.text = v;
-    markSeg('ap-text', v);
+    setSwitch($('#ap-text'), v === 'large');
   }
   function applyMotion(on, save = true) {
     const v = on ? 'reduce' : 'full';
     if (save) lsSet('rd-motion', v);
     document.documentElement.dataset.motion = v;
-    const sw = $('#ap-motion'); if (sw) { sw.classList.toggle('on', !!on); sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+    setSwitch($('#ap-motion'), !!on);
   }
   if ($('#theme-grid')) $('#theme-grid').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-pick]'); if (b) applyTheme(b.dataset.themePick); });
-  if ($('#ap-skin')) $('#ap-skin').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) applySkin(b.dataset.v); });
-  if ($('#ap-density')) $('#ap-density').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) applyDensity(b.dataset.v); });
-  if ($('#ap-text')) $('#ap-text').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) applyTextSize(b.dataset.v); });
+  if ($('#ap-skin')) $('#ap-skin').addEventListener('click', () => applySkin($('#ap-skin').getAttribute('aria-checked') === 'true' ? 'solid' : 'glass'));
+  if ($('#ap-density')) $('#ap-density').addEventListener('click', () => applyDensity($('#ap-density').getAttribute('aria-checked') === 'true' ? 'comfy' : 'compact'));
+  if ($('#ap-text')) $('#ap-text').addEventListener('click', () => applyTextSize($('#ap-text').getAttribute('aria-checked') === 'true' ? 'default' : 'large'));
   if ($('#ap-motion')) $('#ap-motion').addEventListener('click', () => applyMotion($('#ap-motion').getAttribute('aria-checked') !== 'true'));
   applyTheme(lsGet('rd-theme2', 'navy'), false);
   applySkin(lsGet('rd-skin', 'glass'), false);

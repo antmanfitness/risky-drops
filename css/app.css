@@ -669,8 +669,74 @@ td.emph .dz { font-size: 11.5px; }
 .ap-row-t { flex: 1; min-width: 0; }
 .ap-row-t b { display: block; font-size: 15px; font-weight: 700; }
 .ap-row-t small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; line-height: 1.3; }
-#appear-card .dz-switch.on { background: var(--accent-btn); }
-#appear-card .seg { margin: 0; }
+#tab-settings { --ios-sep: var(--hair); }
+#tab-settings h2.section { margin: 4px 4px 6px; }
+#tab-settings .ios-h {
+  margin: 22px 16px 8px; font-size: 13px; font-weight: 400; letter-spacing: .02em;
+  text-transform: uppercase; color: var(--muted);
+}
+#tab-settings .ios-h:first-child, #tab-settings h2.section + .set-cols .set-col > .ios-h:first-child { margin-top: 8px; }
+#tab-settings .ios-foot { margin: 8px 16px 0; font-size: 13px; line-height: 1.35; color: var(--muted); }
+#tab-settings .ios-foot:empty, #tab-settings #test-msg:empty { display: none; }
+#tab-settings .ios-group {
+  margin: 0; padding: 0; overflow: hidden; border-radius: 12px;
+  background: var(--card); border: 0.5px solid var(--hair);
+}
+#tab-settings .ios-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px;
+  padding: 8px 16px; border: 0; background: transparent; color: var(--text);
+  font: inherit; font-size: 17px; text-align: left; text-decoration: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#tab-settings .ios-row + .ios-row,
+#tab-settings .ios-row + #member-form,
+#tab-settings .ios-row + .ios-howto { box-shadow: inset 0 0.5px var(--ios-sep); }
+#tab-settings a.ios-row:active, #tab-settings button.ios-row:active { background: var(--card-2); }
+#tab-settings .ios-label { flex: 1; min-width: 0; font-weight: 400; }
+#tab-settings .ios-accent { color: var(--accent); }
+#tab-settings .ios-danger .ios-label { color: var(--red); text-align: center; width: 100%; }
+#tab-settings .ios-danger { justify-content: center; }
+#tab-settings .ios-chev { flex: none; color: var(--faint); font-size: 22px; line-height: 1; font-weight: 300; }
+#tab-settings .ios-row-stack { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 16px 14px; min-height: 0; }
+#tab-settings .ios-row-stack .ios-label { font-size: 17px; }
+#tab-settings .ios-row-field { cursor: default; }
+#tab-settings .ios-row-field select {
+  flex: 1; width: auto; min-width: 0; max-width: 58%; min-height: 36px; margin: 0;
+  padding: 4px 28px 4px 8px; border: 0; background-color: transparent; color: var(--muted);
+  text-align: right; font-size: 17px;
+}
+#tab-settings #member-form { padding: 8px 16px 14px; box-shadow: inset 0 0.5px var(--ios-sep); }
+#tab-settings .ios-howto { padding: 0 16px 12px; }
+#tab-settings .ios-howto summary {
+  list-style: none; min-height: 44px; display: flex; align-items: center;
+  font-size: 17px; cursor: pointer; margin: 0 -16px; padding: 8px 16px;
+}
+#tab-settings .ios-howto summary::-webkit-details-marker { display: none; }
+#tab-settings .ios-howto ol { margin: 4px 0 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+#tab-settings .ios-sw {
+  flex: none; position: relative; width: 51px; height: 31px; padding: 0; border: 0;
+  border-radius: 16px; background: rgba(120, 120, 128, .32); cursor: pointer;
+  transition: background .2s ease;
+}
+#tab-settings .ios-sw i {
+  position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28); transition: transform .2s ease;
+}
+#tab-settings .ios-sw.on { background: var(--green, #34c759); }
+#tab-settings .ios-sw.on i { transform: translateX(20px); }
+#tab-settings .ios-sw::after { content: ''; position: absolute; inset: -8px -4px; }
+#tab-settings .ios-about { padding: 12px 16px 14px; }
+#tab-settings .ios-about .t { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+#tab-settings .ios-about .d { margin: 6px 0 0; font-size: 15px; }
+#tab-settings .ios-panel { border-radius: 12px; }
+#tab-settings #test-msg { margin: 8px 16px 0; min-height: 0; }
+#tab-settings .ios-row[disabled] { opacity: .45; pointer-events: none; }
+html[data-motion="reduce"] #tab-settings .ios-sw, html[data-motion="reduce"] #tab-settings .ios-sw i { transition: none; }
+
+/* More: match the iOS grouped-list feel */
+.more-list { padding: 0; overflow: hidden; border-radius: 12px; }
+.more-row { min-height: 52px; padding: 8px 14px; border-radius: 0; }
+.more-row + .more-row { border-top: 0.5px solid var(--hair); border-radius: 0; }
 
 /* Extra appearance prefs (device-only, html[data-*]) */
 html[data-skin="solid"] .tabbar { background: var(--bg-2); -webkit-backdrop-filter: none; backdrop-filter: none; }

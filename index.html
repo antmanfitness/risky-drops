@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var T={navy:'#070d1a',graphite:'#0b0e0d',purple:'#0c0717',ember:'#080605',light:'#f2f5fa',classic:'#030404'},t='navy';try{t=localStorage.getItem('rd-theme2')||'navy'}catch(e){}if(!T[t])t='navy';var r=document.documentElement;r.dataset.theme=t;var m=document.querySelector('meta[name=theme-color]');if(m)m.content=T[t];try{var s=localStorage.getItem('rd-skin');if(s==='solid'||s==='glass')r.dataset.skin=s;var d=localStorage.getItem('rd-density');if(d==='compact'||d==='comfy')r.dataset.density=d;var x=localStorage.getItem('rd-text');if(x==='large'||x==='default')r.dataset.text=x;var o=localStorage.getItem('rd-motion');if(o==='reduce'||o==='full')r.dataset.motion=o;}catch(e){}})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261106010304">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261106010304">
-<link rel="stylesheet" href="./css/app.css?v=20261106010304">
-<link rel="stylesheet" href="./css/fold.css?v=20261106010304">
+<link rel="stylesheet" href="./css/tokens.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261106010555">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261106010555">
+<link rel="stylesheet" href="./css/app.css?v=20261106010555">
+<link rel="stylesheet" href="./css/fold.css?v=20261106010555">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -339,57 +339,38 @@
     <h2 class="section">Settings</h2>
     <div class="set-cols">
     <div class="set-col">
-    <p class="kicker" id="appear">Appearance</p>
-    <div class="card th-card" id="appear-card">
-      <p class="t">Theme</p>
-      <p class="d appear-note">Pick a look. Saved on this device only.</p>
-      <div class="th-grid" id="theme-grid" role="radiogroup" aria-label="Theme">
-        <button type="button" class="th-tile" data-theme-pick="navy" role="radio" aria-checked="false" aria-label="Navy"><span class="th-prev" style="background:#070d1a"><i style="background:#5b9bff"></i></span><span class="th-tx"><b>Navy</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="graphite" role="radio" aria-checked="false" aria-label="Graphite"><span class="th-prev" style="background:#0b0e0d"><i style="background:#34d399"></i></span><span class="th-tx"><b>Graph</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="purple" role="radio" aria-checked="false" aria-label="Purple"><span class="th-prev" style="background:#0c0717"><i style="background:#b197fc"></i></span><span class="th-tx"><b>Purple</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="ember" role="radio" aria-checked="false" aria-label="Ember"><span class="th-prev" style="background:#080605"><i style="background:#ff8a3d"></i></span><span class="th-tx"><b>Ember</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="light" role="radio" aria-checked="false" aria-label="Light"><span class="th-prev" style="background:#f2f5fa"><i style="background:#1d4ed8"></i></span><span class="th-tx"><b>Light</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="classic" role="radio" aria-checked="false" aria-label="Classic"><span class="th-prev" style="background:#030404"><i style="background:#2fbf71"></i></span><span class="th-tx"><b>Classic</b></span></button>
-      </div>
-      <div class="ap-block">
-        <p class="ap-label">Look</p>
-        <div class="seg" id="ap-skin" role="radiogroup" aria-label="Look">
-          <button type="button" data-v="glass" class="on">Glass</button>
-          <button type="button" data-v="solid">Solid</button>
+    <p class="ios-h" id="appear">Appearance</p>
+    <div class="ios-group" id="appear-card">
+      <div class="ios-row ios-row-stack">
+        <span class="ios-label">Theme</span>
+        <div class="th-grid" id="theme-grid" role="radiogroup" aria-label="Theme">
+          <button type="button" class="th-tile" data-theme-pick="navy" role="radio" aria-checked="false" aria-label="Navy"><span class="th-prev" style="background:#070d1a"><i style="background:#5b9bff"></i></span><span class="th-tx"><b>Navy</b></span></button>
+          <button type="button" class="th-tile" data-theme-pick="graphite" role="radio" aria-checked="false" aria-label="Graphite"><span class="th-prev" style="background:#0b0e0d"><i style="background:#34d399"></i></span><span class="th-tx"><b>Graph</b></span></button>
+          <button type="button" class="th-tile" data-theme-pick="purple" role="radio" aria-checked="false" aria-label="Purple"><span class="th-prev" style="background:#0c0717"><i style="background:#b197fc"></i></span><span class="th-tx"><b>Purple</b></span></button>
+          <button type="button" class="th-tile" data-theme-pick="ember" role="radio" aria-checked="false" aria-label="Ember"><span class="th-prev" style="background:#080605"><i style="background:#ff8a3d"></i></span><span class="th-tx"><b>Ember</b></span></button>
+          <button type="button" class="th-tile" data-theme-pick="light" role="radio" aria-checked="false" aria-label="Light"><span class="th-prev" style="background:#f2f5fa"><i style="background:#1d4ed8"></i></span><span class="th-tx"><b>Light</b></span></button>
+          <button type="button" class="th-tile" data-theme-pick="classic" role="radio" aria-checked="false" aria-label="Classic"><span class="th-prev" style="background:#030404"><i style="background:#2fbf71"></i></span><span class="th-tx"><b>Classic</b></span></button>
         </div>
       </div>
-      <div class="ap-block">
-        <p class="ap-label">Density</p>
-        <div class="seg" id="ap-density" role="radiogroup" aria-label="Density">
-          <button type="button" data-v="comfy" class="on">Comfortable</button>
-          <button type="button" data-v="compact">Compact</button>
-        </div>
-      </div>
-      <div class="ap-block">
-        <p class="ap-label">Text size</p>
-        <div class="seg" id="ap-text" role="radiogroup" aria-label="Text size">
-          <button type="button" data-v="default" class="on">Default</button>
-          <button type="button" data-v="large">Larger</button>
-        </div>
-      </div>
-      <div class="ap-row">
-        <span class="ap-row-t"><b>Reduce motion</b><small>Quieter animations on this device</small></span>
-        <button type="button" class="dz-switch" id="ap-motion" role="switch" aria-checked="false" aria-label="Reduce motion"><i></i></button>
-      </div>
+      <div class="ios-row"><span class="ios-label">Glass</span><button type="button" class="ios-sw" id="ap-skin" role="switch" aria-checked="true" aria-label="Glass look"><i></i></button></div>
+      <div class="ios-row"><span class="ios-label">Compact</span><button type="button" class="ios-sw" id="ap-density" role="switch" aria-checked="false" aria-label="Compact density"><i></i></button></div>
+      <div class="ios-row"><span class="ios-label">Larger Text</span><button type="button" class="ios-sw" id="ap-text" role="switch" aria-checked="false" aria-label="Larger text"><i></i></button></div>
+      <div class="ios-row"><span class="ios-label">Reduce Motion</span><button type="button" class="ios-sw" id="ap-motion" role="switch" aria-checked="false" aria-label="Reduce motion"><i></i></button></div>
     </div>
-    <p class="kicker">Account</p>
-    <div class="card" id="acct-card">
-      <p class="t">Account</p>
-      <p class="d" id="acct-who"></p>
-      <div class="actions"><a class="btn" href="#friends">Friends &amp; logins</a><button class="btn" type="button" id="acct-logout">Log out</button></div>
+    <p class="ios-foot">Saved on this device only.</p>
+
+    <p class="ios-h">Account</p>
+    <div class="ios-group" id="acct-card">
+      <a class="ios-row" href="#friends"><span class="ios-label">Friends &amp; Logins</span><span class="ios-chev" aria-hidden="true">›</span></a>
+      <button type="button" class="ios-row ios-danger" id="acct-logout"><span class="ios-label">Log Out</span></button>
     </div>
-    <p class="kicker">People &amp; notifications</p>
-    <div class="card" id="member-card">
-      <p class="t">Who's using this? (members &amp; collectors)</p>
-      <p class="d">Pick yourself so your countdowns and reminders are yours. Saved on this device only.</p>
-      <label class="field">Member<select id="member-pick"></select></label>
-      <p class="d" id="member-topic"></p>
-      <div class="actions"><button class="btn" id="member-edit" type="button">Edit me</button><button class="btn" id="member-add" type="button">+ Add member</button></div>
+    <p class="ios-foot" id="acct-who"></p>
+
+    <p class="ios-h">People &amp; Notifications</p>
+    <div class="ios-group" id="member-card">
+      <label class="ios-row ios-row-field">Member<select id="member-pick"></select></label>
+      <button class="ios-row" type="button" id="member-edit"><span class="ios-label">Edit Me</span><span class="ios-chev" aria-hidden="true">›</span></button>
+      <button class="ios-row" type="button" id="member-add"><span class="ios-label">Add Member</span><span class="ios-chev" aria-hidden="true">›</span></button>
       <form id="member-form" hidden autocomplete="off">
         <label class="field">Name<input type="text" name="name" required maxlength="60" placeholder="e.g. Dev"></label>
         <label class="field">ntfy topic (for reminders)<input type="text" name="topic" maxlength="64" autocapitalize="off" spellcheck="false" placeholder="e.g. rd-dev-7f3k2q"></label>
@@ -397,20 +378,22 @@
         <div class="actions"><button class="btn buy" type="submit">Save</button><button class="btn" type="button" id="member-cancel">Cancel</button></div>
         <p class="msg" id="member-msg"></p>
       </form>
-      <details class="howto"><summary>Set up reminders on your phone</summary>
+      <details class="howto ios-howto"><summary>Set Up Reminders on Your Phone</summary>
         <ol><li>Install <b>ntfy</b> (App Store or Google Play).</li><li>Tap <b>+</b> → Subscribe to topic, type your exact topic above, server <b>ntfy.sh</b>.</li><li>Allow notifications when asked (iPhone: Settings → ntfy → Allow Notifications, Time Sensitive on).</li><li>Create a countdown with a reminder. The box sends it within ~30s of the reminder time.</li></ol>
       </details>
     </div>
-    <div class="card">
-      <p class="t">Push alerts</p>
-      <p class="d">Alerts go to the ntfy app on your iPhone (topic antman-iphone-80f30bef). Send a test to make sure they come through.</p>
-      <div class="actions"><button class="btn buy" id="test-btn">Send test notification</button></div>
-      <p class="msg" id="test-msg"></p>
+    <p class="ios-foot" id="member-topic"></p>
+    <p class="ios-foot">Pick yourself so your countdowns and reminders are yours. Saved on this device only.</p>
+
+    <div class="ios-group" style="margin-top:22px">
+      <button type="button" class="ios-row" id="test-btn"><span class="ios-label ios-accent">Send Test Notification</span></button>
     </div>
+    <p class="msg" id="test-msg"></p>
+    <p class="ios-foot">Alerts go to the ntfy app on your iPhone (topic antman-iphone-80f30bef).</p>
     </div>
     <div class="set-col">
-    <p class="kicker">Tools</p>
-    <div class="card fc" id="calc-card">
+    <p class="ios-h">Tools</p>
+    <div class="card fc ios-panel" id="calc-card">
       <div class="row"><p class="t grow">Fee &amp; profit calculator</p><button type="button" class="linkbtn" id="fc-reset">Clear</button></div>
       <p class="d">Pick where you’re selling; fees fill in from that platform and stay editable. Updates as you type.</p>
       <form id="fc-form" autocomplete="off" novalidate onsubmit="return false">
@@ -451,8 +434,8 @@
       <div class="fc-out" id="fc-out" aria-live="polite"></div>
       <p class="f" id="fc-asof"></p>
     </div>
-    <p class="kicker">About</p>
-    <div class="card">
+    <p class="ios-h">About</p>
+    <div class="ios-group ios-about">
       <p class="t">How it works</p>
       <p class="d">Watchers run on the Linux box. Status refreshes every 45s; this screen refreshes every 30s. All times are Eastern (ET).</p>
       <p class="d">Risky Drops only watches and links. It never buys, adds to cart, checks out, or stores payment info. You check out yourself.</p>
@@ -734,10 +717,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261106010304"></script>
-<script src="./js/orbit.js?v=20261106010304"></script>
-<script src="./js/classify.js?v=20261106010304"></script>
-<script src="./js/scanner.js?v=20261106010304"></script>
-<script src="./js/app.js?v=20261106010304"></script>
+<script src="./js/config.js?v=20261106010555"></script>
+<script src="./js/orbit.js?v=20261106010555"></script>
+<script src="./js/classify.js?v=20261106010555"></script>
+<script src="./js/scanner.js?v=20261106010555"></script>
+<script src="./js/app.js?v=20261106010555"></script>
 </body>
 </html>
