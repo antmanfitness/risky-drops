@@ -377,6 +377,18 @@ input:invalid:not(:placeholder-shown) { border-color: var(--red); }
 .tpick b { font-size: 15px; font-weight: 700; }
 .tpick small { color: var(--faint); font-size: 11.5px; line-height: 1.25; }
 #tab-friend .tpick { background: var(--bg-2); }
+.wpick-lead { margin: 0 4px 10px; }
+.wpick-grid { margin: 0 0 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 560px) { .wpick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.wpick-grid .tpick { min-height: 110px; }
+.wpick-grid .tpick small { text-align: center; }
+#watch-list .wcard { cursor: pointer; }
+#watch-list .wcard:hover { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .28); }
+.dz-titlebar .dz-tb-l { min-width: 0; }
+.dz-titlebar .back-link { display: block; padding: 2px 0 0; min-height: 28px; }
+.dz-titlebar h2.section { margin-top: 0; }
+#tab-ps5 > .back-link { margin-bottom: 0; padding-bottom: 2px; }
+.hchip-btn { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 .tchip { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; background: var(--accent-dim); color: var(--accent-2); vertical-align: 2px; margin-right: 6px; }
 .sd-types { margin: 10px -2px 0; }
 

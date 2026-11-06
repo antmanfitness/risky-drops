@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var T={navy:'#070d1a',graphite:'#0b0e0d',purple:'#0c0717',ember:'#080605',light:'#f2f5fa',classic:'#030404'},t='navy';try{t=localStorage.getItem('rd-theme2')||'navy'}catch(e){}if(!T[t])t='navy';document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name=theme-color]');if(m)m.content=T[t];})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261029075916">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261029075916">
-<link rel="stylesheet" href="./css/app.css?v=20261029075916">
-<link rel="stylesheet" href="./css/fold.css?v=20261029075916">
+<link rel="stylesheet" href="./css/tokens.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261106005309">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261106005309">
+<link rel="stylesheet" href="./css/app.css?v=20261106005309">
+<link rel="stylesheet" href="./css/fold.css?v=20261106005309">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -116,7 +116,7 @@
     <div id="dash-cards"></div>
   </section>
   <section class="screen dz-screen" id="tab-duo" hidden>
-    <div class="dz-titlebar"><h2 class="section">Duo Stock</h2><button type="button" class="btn buy dz-go-top" id="duo-go">Check now</button></div>
+    <div class="dz-titlebar"><div class="dz-tb-l"><button type="button" class="back-link" id="duo-back">‹ All watches</button><h2 class="section">Duo Stock</h2></div><button type="button" class="btn buy dz-go-top" id="duo-go">Check now</button></div>
     <!-- 1. Status: watcher + Apple health / blocks + last checkout run -->
     <div class="card dz-status" id="duo-status" role="status" aria-live="polite"></div>
     <div class="card ab-row" data-ab role="button" tabindex="0" aria-expanded="false" aria-label="Auto-buy policy status"></div>
@@ -158,7 +158,7 @@
       </div></details>
   </section>
   <section class="screen" id="tab-people" hidden>
-    <div class="dz-titlebar"><h2 class="section">Pickup people</h2><button type="button" class="btn buy dz-go-top" id="pp-add" aria-haspopup="dialog">+ Add person</button></div>
+    <div class="dz-titlebar"><div class="dz-tb-l"><button type="button" class="back-link" id="pp-back">‹ More</button><h2 class="section">Pickup people</h2></div><button type="button" class="btn buy dz-go-top" id="pp-add" aria-haspopup="dialog">+ Add person</button></div>
     <div class="pp-cols">
       <div class="pp-side">
         <div class="card ab-row" data-ab role="button" tabindex="0" aria-expanded="false" aria-label="Auto-buy policy status"></div>
@@ -173,6 +173,7 @@
   </section>
 
   <section class="screen" id="tab-ps5" hidden>
+    <button type="button" class="back-link" id="ps5-back">‹ All watches</button>
     <h2 class="section">PS5 Pro</h2>
     <div class="ps-cols">
     <div class="card ps-main" id="ps5-main"></div>
@@ -203,17 +204,28 @@
     <div id="w-dash"></div>
     <div class="card summary" id="summary"></div>
     <div id="watch-list"></div>
-    <div class="kicker">Add an item</div>
-    <form class="card" id="add-form" autocomplete="off">
-      <p class="t">Watch something new</p>
-      <p class="d">Apple part number (e.g. MKFN4LL/A) watches Apple Store pickup every 60s and skips NY stores. Any other product URL gets a light page watcher. Target, Walmart and GameStop block this box, so they're marked Blocked.</p>
-      <label class="field">Product URL or Apple part number<input type="text" name="target" required placeholder="MKFN4LL/A or https://…" autocapitalize="off" spellcheck="false"></label>
-      <label class="field">Name (optional)<input type="text" name="name" placeholder="e.g. AirPods Pro 3"></label>
-      <label class="field">ZIPs<input type="text" name="zips" inputmode="numeric" value="08872" placeholder="08872, 07052, 19103"></label>
-      <label class="field">Sizes (optional, page watcher)<input type="text" name="sizes" placeholder="8, 9.5, 10"></label>
-      <div class="actions"><button class="btn buy" type="submit">Start watching</button></div>
-      <p class="msg" id="add-msg"></p>
-    </form>
+    <div id="w-add">
+      <div id="w-pick-view">
+        <div class="kicker">Add a watch</div>
+        <p class="d wpick-lead">Pick an item, fill in what it needs, then it lands on your watch list. Built-in drops open their own screen.</p>
+        <div class="tpick-grid wpick-grid" id="w-pick" role="list"></div>
+      </div>
+      <div id="w-pick-confirm" hidden>
+        <button type="button" class="back-link" id="w-pick-back">‹ Choose item type</button>
+        <div class="card" id="w-pick-card"></div>
+      </div>
+      <form class="card" id="add-form" autocomplete="off" hidden>
+        <button type="button" class="back-link" id="add-back">‹ Choose item type</button>
+        <p class="t">Watch something new</p>
+        <p class="d">Apple part number (e.g. MKFN4LL/A) watches Apple Store pickup every 60s and skips NY stores. Any other product URL gets a light page watcher. Target, Walmart and GameStop block this box, so they're marked Blocked.</p>
+        <label class="field">Product URL or Apple part number<input type="text" name="target" required placeholder="MKFN4LL/A or https://…" autocapitalize="off" spellcheck="false"></label>
+        <label class="field">Name (optional)<input type="text" name="name" placeholder="e.g. AirPods Pro 3"></label>
+        <label class="field">ZIPs<input type="text" name="zips" inputmode="numeric" value="08872" placeholder="08872, 07052, 19103"></label>
+        <label class="field">Sizes (optional, page watcher)<input type="text" name="sizes" placeholder="8, 9.5, 10"></label>
+        <div class="actions"><button class="btn buy" type="submit">Start watching</button></div>
+        <p class="msg" id="add-msg"></p>
+      </form>
+    </div>
     </div>
     </div>
     <div id="w-favs" hidden>
@@ -302,15 +314,15 @@
     <h2 class="section">More</h2>
     <div class="more-cols">
       <div class="more-col">
-        <p class="kicker">Inventory &amp; sales</p>
+        <p class="kicker">Inventory</p>
         <div class="card more-list">
         <button type="button" class="more-row" data-go="phones"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z M3 8l9 5 9-5M12 13v8"/></svg></span><span class="more-tx"><b>Items</b><small>Phones, consoles and collector payouts</small></span><span class="more-chev" aria-hidden="true">›</span></button>
-        <button type="button" class="more-row" data-go="sales"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/></svg></span><span class="more-tx"><b>Sales</b><small>Listings, sold, profit and comps</small></span><span class="more-chev" aria-hidden="true">›</span></button>
         <button type="button" class="more-row" data-go="favs"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8 6.8 19.6l1-5.8L3.5 9.7l5.9-.9z"/></svg></span><span class="more-tx"><b>Favorites</b><small>Saved items to watch later</small></span><span class="more-n" id="more-fav-n"></span><span class="more-chev" aria-hidden="true">›</span></button>
         </div>
         <p class="kicker">People</p>
         <div class="card more-list">
         <button type="button" class="more-row" data-go="friends"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></span><span class="more-tx"><b>Friends &amp; logins</b><small>Add friends and manage their access</small></span><span class="more-chev" aria-hidden="true">›</span></button>
+        <button type="button" class="more-row" data-go="people"><span class="more-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg></span><span class="more-tx"><b>Pickup people</b><small>Who picks up Apple orders</small></span><span class="more-chev" aria-hidden="true">›</span></button>
         </div>
         <p class="kicker">Assistant &amp; app</p>
         <div class="card more-list">
@@ -453,10 +465,8 @@
 <button class="ask-orb" id="ask-open" type="button" aria-label="Ask Risky"><span class="ask-orb-glow"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span class="ask-orb-label">Ask</span></button>
 <nav class="tabbar" role="tablist" aria-label="Main">
   <button data-tab="home" role="tab" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
-  <button data-tab="duo" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Duo</button>
-  <button data-tab="ps5" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 10v4M6 12h4M16 11h.01M18 13h.01"/></svg>PS5 Pro</button>
   <button data-tab="watches" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M21 12h-2"/></svg><span class="badge" id="tab-badge"></span>Watches</button>
-  <button data-tab="people" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg>Pickup</button>
+  <button data-tab="sales" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>Sales</button>
   <button data-tab="more" role="tab" aria-label="More"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><circle cx="17" cy="17" r="3.6"/></svg>More</button>
 </nav>
 <div class="sheet-back" id="sheet-back" hidden></div>
@@ -697,10 +707,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261029075916"></script>
-<script src="./js/orbit.js?v=20261029075916"></script>
-<script src="./js/classify.js?v=20261029075916"></script>
-<script src="./js/scanner.js?v=20261029075916"></script>
-<script src="./js/app.js?v=20261029075916"></script>
+<script src="./js/config.js?v=20261106005309"></script>
+<script src="./js/orbit.js?v=20261106005309"></script>
+<script src="./js/classify.js?v=20261106005309"></script>
+<script src="./js/scanner.js?v=20261106005309"></script>
+<script src="./js/app.js?v=20261106005309"></script>
 </body>
 </html>

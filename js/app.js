@@ -109,22 +109,26 @@
   }
 
   // ---------- tabs
-  // Dock: Home / Duo / PS5 Pro / Watches / Pickup / More. More holds Items, Sales, Favorites, Friends, Ask and Settings (admin link only) plus the theme picker.
-  // Items, Sales, Friends, Settings and Ask keep their own screens; the dock highlights More while you are on one of them.
-  const MORE_SET = ['more', 'phones', 'sales', 'friends', 'settings', 'ask'];
+  // Dock: Home / Watches / Sales / More. Duo and PS5 Pro are watch details (not bottom tabs). Pickup lives under More.
+  // Items, Friends, Settings, Pickup and Ask keep their own screens; the dock highlights More while you are on one of them.
+  const MORE_SET = ['more', 'phones', 'people', 'friends', 'settings', 'ask'];
   const LEGACY = { items: ['phones', undefined], alerts: ['watches', 'alerts'], countdowns: ['watches', 'countdowns'], listings: ['sales', 'listings'], flip: ['sales', 'comps'] };
+  const RICH_WATCH = { duo: 'duo', ps5: 'ps5', ps5wm: 'ps5' };
+  const dockFor = (tab) => (tab === 'duo' || tab === 'ps5') ? 'watches' : tab;
+  const watchHash = (tab) => tab === 'phones' ? 'items' : tab === 'duo' ? 'watches/w/duo' : tab === 'ps5' ? 'watches/w/ps5' : tab;
   function show(tab, sub) {
     if (LEGACY[tab]) [tab, sub] = LEGACY[tab];
     state.tab = tab;
     document.querySelectorAll('.screen').forEach((s) => (s.hidden = s.id !== 'tab-' + tab));
-    document.querySelectorAll('.tabbar button').forEach((b) => { const on = b.dataset.tab === tab || (b.dataset.tab === 'more' && MORE_SET.includes(tab)); b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    const dock = dockFor(tab);
+    document.querySelectorAll('.tabbar button').forEach((b) => { const on = b.dataset.tab === dock || (b.dataset.tab === 'more' && MORE_SET.includes(tab)); b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('#gear').classList.toggle('on', tab === 'settings');
     $('#ask-open').hidden = tab === 'ask' || tab === 'duo' || tab === 'ps5' || tab === 'people';   // the sticky Check now button lives where the orb floats
     if (tab === 'duo' && typeof duoOpen === 'function') duoOpen();
     if (tab === 'ps5' && typeof ps5Open === 'function') ps5Open();
     if ((tab === 'people' || tab === 'duo') && typeof ppOpen === 'function') ppOpen(tab);
-    const tb = document.querySelector(`.tabbar button[data-tab="${tab}"]`); if (tb && tb.scrollIntoView) tb.scrollIntoView({ inline: 'center', block: 'nearest' });
-    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + (tab === 'phones' ? 'items' : tab) + (tab === 'friends' && sub ? '/' + sub : ''));
+    const tb = document.querySelector(`.tabbar button[data-tab="${dock}"]`); if (tb && tb.scrollIntoView) tb.scrollIntoView({ inline: 'center', block: 'nearest' });
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + watchHash(tab) + (tab === 'friends' && sub ? '/' + sub : ''));
     if (sub && tab === 'watches') showSub('w', sub);
     if (sub && tab === 'sales') showSub('s', sub);
     if (tab === 'sales' && typeof renderTracker === 'function' && ext.loaded) setTimeout(renderTracker, 0);
@@ -237,7 +241,7 @@
       : `<button class="btn" data-act="pause" data-id="${esc(i.id)}">Pause</button>`) : '';
     const h = i.health || {};
     const blockLine = prob ? `<p class="blk-line"><b>${blocked ? 'Blocked' : 'Check failing'}</b>${h.http_status ? `<span>HTTP ${esc(h.http_status)}</span>` : ''}${h.kind ? `<span>${esc(KIND_SHORT[h.kind] || h.kind.replace(/_/g, ' '))}</span>` : ''}${h.consecutive_failures ? `<span>${esc(h.consecutive_failures)}× in a row</span>` : ''}${h.blocked_at ? `<span>since ${esc(et(h.blocked_at))}</span>` : ''}</p>` : '';
-    return `<div class="card wcard ${i.status === 'in_stock' ? 'in-stock-card' : ''} ${blocked ? 'blocked-card' : ''}" id="wc-${esc(i.id)}">
+    return `<div class="card wcard ${i.status === 'in_stock' ? 'in-stock-card' : ''} ${blocked ? 'blocked-card' : ''}" id="wc-${esc(i.id)}" data-wopen="${esc(i.id)}">
       <div class="row"><p class="t grow">${favd ? '<span class="fav-star" title="In favorites" aria-label="In favorites">★</span> ' : ''}${esc(i.name)}</p><span class="pill ${esc(blocked ? 'blocked' : i.status)}">${esc(blocked ? 'Blocked' : (LABEL[i.status] || i.status))}</span>
         ${CFG ? `<div class="client-menu wmenu"><button type="button" class="client-menu-trigger" aria-label="More actions for ${esc(i.name)}" aria-haspopup="menu" aria-expanded="${wMenu === i.id}" data-wmenu="${esc(i.id)}">⋯</button>
         ${wMenu === i.id ? `<div class="client-menu-pop" role="menu"><button type="button" role="menuitem" data-wfav="${esc(i.id)}">${favd ? '★ In favorites' : '☆ Add to favorites'}</button><button type="button" role="menuitem" data-wdiag="${esc(i.id)}">Diagnose</button><button type="button" role="menuitem" class="danger" data-wdel="${esc(i.id)}">Delete watch</button></div>` : ''}</div>` : ''}</div>
@@ -281,6 +285,7 @@
 
   function renderWatches() {
     const items = state.status?.items || [];
+    if (typeof renderWatchPicker === 'function') renderWatchPicker();
     const lastSync = state.syncedAt || state.status?.generated;
     const stale = lastSync && Date.now() - new Date(lastSync).getTime() > 3 * 60 * 1000;
     $('#updated').textContent = lastSync ? (stale ? 'Box offline? Last sync ' : 'Updated ') + et(lastSync) : '';
@@ -427,6 +432,9 @@
     if (t('[data-wfav]')) { wMenu = null; favFromWatch(t('[data-wfav]').dataset.wfav); return; }
     if (t('[data-wdiag]')) { wMenu = null; renderWatches(); openDiag(t('[data-wdiag]').dataset.wdiag); return; }
     if (t('[data-wretry]')) { doRetry(t('[data-wretry]').dataset.wretry, t('[data-wretry]')); return; }
+    if (!state.wdetail && !t('button, a, input, select, textarea, label') && t('.wcard[data-wopen]')) {
+      location.hash = 'watches/w/' + encodeURIComponent(t('.wcard[data-wopen]').dataset.wopen); return;
+    }
     const b = t('button[data-act]'); if (!b) return;
     const { act, id } = b.dataset;
     if (act === 'delete') { doDelete(id); return; }
@@ -439,6 +447,9 @@
   $('#watch-list').addEventListener('click', onWatchClick);
   $('#wdetail-body').addEventListener('click', onWatchClick);
   $('#wd-back').addEventListener('click', () => { location.hash = 'watches/list'; });
+  if ($('#duo-back')) $('#duo-back').addEventListener('click', () => { location.hash = 'watches/list'; });
+  if ($('#ps5-back')) $('#ps5-back').addEventListener('click', () => { location.hash = 'watches/list'; });
+  if ($('#pp-back')) $('#pp-back').addEventListener('click', () => { location.hash = 'more'; });
   document.addEventListener('click', (e) => { if (wMenu && !e.target.closest('.wmenu')) { wMenu = null; renderWatches(); } });
   $('#dg-retry').addEventListener('click', (e) => { closeSheet(); doRetry(e.currentTarget.dataset.id); });
 
@@ -515,6 +526,73 @@
       }
     });
   }
+  const WATCH_TYPES = [
+    { id: 'duo', title: 'iPhone Duo', hint: 'Apple Store pickup', icon: ICON.phone, rich: 'duo',
+      blurb: 'Unlocked iPhone Duo at Apple pickup. Colors, sizes, ZIP and check interval live on the Duo screen.' },
+    { id: 'ps5', title: 'PS5 Pro', hint: 'Walmart, Direct, Best Buy, Amazon', icon: ICON.console, rich: 'ps5', ids: ['ps5', 'ps5wm'],
+      blurb: 'Walmart New vs open box and your price cap are on the PS5 Pro screen. Direct, Best Buy and Amazon stay on the watch list too.' },
+    { id: 'beats', title: 'Pokémon Beats Pill', hint: 'Apple MKFN4LL/A', icon: ICON.other,
+      blurb: 'Apple pickup watch for the Pokémon Beats Pill (part MKFN4LL/A). NY stores are skipped.',
+      prefills: { target: 'MKFN4LL/A', name: 'Pokémon Beats Pill' } },
+    { id: 'zelda', title: 'Zelda Switch 2', hint: '40th Anniversary console + controller', icon: ICON.console, ids: ['zelda', 'zeldactrl'],
+      blurb: 'Zelda Switch 2 40th Anniversary console and Pro Controller at Target, GameStop and Walmart (NJ plus online).' },
+    { id: 'custom', title: 'Custom / Other', hint: 'Any URL or Apple part', icon: ICON.other, custom: true,
+      blurb: 'Paste a product URL or an Apple part number. Name, ZIPs and sizes are optional.' },
+  ];
+  const itemsForType = (t) => {
+    const ids = t.ids || [t.id];
+    return (state.status?.items || []).filter((i) => ids.includes(i.id));
+  };
+  function resetAddWatch() {
+    if (!$('#w-pick-view')) return;
+    $('#w-pick-view').hidden = false;
+    if ($('#w-pick-confirm')) $('#w-pick-confirm').hidden = true;
+    if ($('#add-form')) $('#add-form').hidden = true;
+    const msg = $('#add-msg'); if (msg) { msg.className = 'msg'; msg.textContent = ''; }
+  }
+  function showAddCustom(pre) {
+    $('#w-pick-view').hidden = true;
+    if ($('#w-pick-confirm')) $('#w-pick-confirm').hidden = true;
+    const f = $('#add-form'); f.hidden = false;
+    if (pre) { if (pre.target) f.target.value = pre.target; if (pre.name) f.name.value = pre.name; }
+    const first = f.querySelector('input[name="target"]'); if (first) first.focus();
+  }
+  function renderWatchPicker() {
+    const box = $('#w-pick'); if (!box) return;
+    box.innerHTML = WATCH_TYPES.map((t) => {
+      const on = !t.custom && itemsForType(t).length;
+      return `<button type="button" class="tpick" role="listitem" data-wpick="${esc(t.id)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${t.icon}</svg><b>${esc(t.title)}</b><small>${on ? 'On your watch list' : esc(t.hint)}</small></button>`;
+    }).join('');
+  }
+  function showPickConfirm(t) {
+    if (t.custom) { showAddCustom(); return; }
+    const found = itemsForType(t);
+    if (!found.length && t.prefills) { showAddCustom(t.prefills); return; }
+    $('#w-pick-view').hidden = true;
+    $('#add-form').hidden = true;
+    $('#w-pick-confirm').hidden = false;
+    const names = found.map((i) => i.name).join(' · ');
+    const status = found.length
+      ? `<p class="d">${esc(names)} ${found.length === 1 ? 'is' : 'are'} already on your watch list. Open to see live status and settings.</p>`
+      : '<p class="d">This built-in watcher is not in the current list. You can still open its screen if it has one.</p>';
+    let actions = '';
+    if (t.rich) actions += `<button type="button" class="btn buy" data-wopen="${esc(t.rich)}">${found.length ? 'Open' : 'Open screen'}</button>`;
+    else found.forEach((i) => { actions += `<button type="button" class="btn buy" data-wopen="${esc(i.id)}">Open ${esc(i.name)}</button>`; });
+    $('#w-pick-card').innerHTML = `<p class="t">${esc(t.title)}</p><p class="d">${esc(t.blurb)}</p>${status}<div class="actions">${actions}</div>`;
+  }
+  if ($('#w-pick')) {
+    renderWatchPicker();
+    $('#w-pick').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-wpick]'); if (!b) return;
+      const t = WATCH_TYPES.find((x) => x.id === b.dataset.wpick); if (t) showPickConfirm(t);
+    });
+    $('#w-pick-back').addEventListener('click', resetAddWatch);
+    $('#add-back').addEventListener('click', () => { resetAddWatch(); const f = $('#add-form'); f.target.value = ''; f.name.value = ''; f.sizes.value = ''; });
+    $('#w-pick-card').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-wopen]'); if (b) location.hash = 'watches/w/' + encodeURIComponent(b.dataset.wopen);
+    });
+  }
+
   $('#add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target, msg = $('#add-msg'), btn = f.querySelector('button');
@@ -1585,11 +1663,14 @@
       card('phones', 'Recent items', P.length ? P.slice(0, 5).map((p) => `<div class="drow"><span class="grow"><b>${esc(phoneName(p))}</b><small>${esc(maskSerial(p.serial))} · ${esc(p.member || 'No collector')} · ${esc(et(p.created_at))}</small></span><b>${money(+p.price_paid)}</b></div>`).join('') : '<p class="d">Nothing logged yet.</p>') +
       card('phones', `Flags${flags.length ? ` <span class="pill price_drop">${flags.length}</span>` : ''}`, flags.length ? flags.slice(0, 6).map((x) => `<div class="drow flagrow"><span class="grow"><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></div>`).join('') : '<p class="d">No duplicate or mismatch flags.</p>', 'Review') +
       card('watches/alerts', 'Latest restock alerts', restocks.length ? restocks.map((a) => `<div class="drow"><span class="grow"><b>${esc(a.item || a.title)}</b><small>${esc([a.store, a.city].filter(Boolean).join(', '))} · ${esc(a.time_et || et(a.ts))}</small></span></div>`).join('') : '<p class="d">No restocks yet.</p>') +
-      card('watches/list', 'Watcher health', `<div class="drow"><span class="grow">${items.map((i) => `<span class="hchip"><span class="dot ${i.alive ? 'on' : i.status === 'scheduled' || i.paused ? '' : 'off'}"></span>${esc(i.name.split(' (')[0])}${i.status === 'blocked' ? ' · blocked' : i.status === 'in_stock' ? ' · IN STOCK' : ''}</span>`).join('')}</span></div>`);
+      card('watches/list', 'Watcher health', `<div class="drow"><span class="grow">${items.map((i) => `<button type="button" class="hchip hchip-btn" data-go="watches/w/${enc(i.id)}"><span class="dot ${i.alive ? 'on' : i.status === 'scheduled' || i.paused ? '' : 'off'}"></span>${esc(i.name.split(' (')[0])}${i.status === 'blocked' ? ' · blocked' : i.status === 'in_stock' ? ' · IN STOCK' : ''}</button>`).join('')}</span></div>`);
   }
   $('#tab-home').addEventListener('click', (e) => {
     const c = e.target.closest('[data-gocoll]'); if (c) { ph.filter = c.dataset.gocoll === '' ? null : +c.dataset.gocoll; show('phones'); renderPhones(); return; }
-    const b = e.target.closest('[data-go]'); if (!b) return; const [t, sub] = b.dataset.go.split('/'); show(t, sub);
+    const b = e.target.closest('[data-go]'); if (!b) return;
+    const parts = b.dataset.go.split('/');
+    if (parts[0] === 'watches' && parts[1] === 'w' && parts[2]) { location.hash = 'watches/w/' + encodeURIComponent(parts[2]); return; }
+    show(parts[0], parts[1]);
   });
 
   // ================= Accounts: one login screen, friend mode (own uploads + receipts only), admin Friends view =================
@@ -2202,9 +2283,11 @@
   } else { document.querySelectorAll('.tabbar [data-tab="people"]').forEach((b) => (b.hidden = true)); document.querySelectorAll('[data-ab]').forEach((b) => (b.hidden = true)); }
 
   const route = () => { const [h, hs, h3] = location.hash.slice(1).split('/');
+    const wid = (h === 'watches' && hs === 'w' && h3) ? decodeURIComponent(h3) : '';
+    if (h === 'duo' || (h === 'watches' && hs === 'duo') || RICH_WATCH[wid] === 'duo') { state.wdetail = null; show('duo'); return; }
+    if (h === 'ps5' || (h === 'watches' && hs === 'ps5') || RICH_WATCH[wid] === 'ps5') { state.wdetail = null; show('ps5'); return; }
     if (h === 'watches' && hs === 'w' && h3) { state.wdetail = decodeURIComponent(h3); show('watches', 'list'); history.replaceState(null, '', location.pathname + location.search + '#watches/w/' + h3); renderWatches(); return; }
     if (state.wdetail) { state.wdetail = null; if (state.status) renderWatches(); }
-    if (h === 'watches' && hs === 'duo') { show('duo'); return; }
     if (h === 'friends') { frDetail = hs && /^\d+$/.test(hs) ? +hs : null; show('friends', hs || null); return; }
     if (['home', 'duo', 'ps5', 'people', 'more', 'watches', 'phones', 'sales', 'settings', 'ask', ...Object.keys(LEGACY)].includes(h)) { show(h, hs); if (h === 'ask') loadAsk().catch(() => {}); } else show('home'); };
   if (MODE === 'admin') {
