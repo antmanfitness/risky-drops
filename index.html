@@ -16,16 +16,16 @@
 <link rel="icon" href="./icons/favicon.png">
 <link rel="manifest" href="./manifest.json">
 <script>(function(){var T={navy:'#070d1a',graphite:'#0b0e0d',purple:'#0c0717',ember:'#080605',light:'#f2f5fa',classic:'#030404'},t='navy';try{t=localStorage.getItem('rd-theme2')||'navy'}catch(e){}if(!T[t])t='navy';var r=document.documentElement;r.dataset.theme=t;var m=document.querySelector('meta[name=theme-color]');if(m)m.content=T[t];try{var s=localStorage.getItem('rd-skin');if(s==='solid'||s==='glass')r.dataset.skin=s;var d=localStorage.getItem('rd-density');if(d==='compact'||d==='comfy')r.dataset.density=d;var x=localStorage.getItem('rd-text');if(x==='large'||x==='default')r.dataset.text=x;var o=localStorage.getItem('rd-motion');if(o==='reduce'||o==='full')r.dataset.motion=o;}catch(e){}})();</script>
-<link rel="stylesheet" href="./css/tokens.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/brand.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/splash.css?v=20261106010138">
-<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261106010138">
-<link rel="stylesheet" href="./css/app.css?v=20261106010138">
-<link rel="stylesheet" href="./css/fold.css?v=20261106010138">
+<link rel="stylesheet" href="./css/tokens.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/brand.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/orbit.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/ios-polish.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/v126-inputs.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/v135-fit.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/splash.css?v=20261106010304">
+<link rel="stylesheet" href="./css/vendor/no-zoom.css?v=20261106010304">
+<link rel="stylesheet" href="./css/app.css?v=20261106010304">
+<link rel="stylesheet" href="./css/fold.css?v=20261106010304">
 </head>
 <body>
 <div id="boot"><div class="wcs-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#logo"/></svg></div></div>
@@ -344,12 +344,12 @@
       <p class="t">Theme</p>
       <p class="d appear-note">Pick a look. Saved on this device only.</p>
       <div class="th-grid" id="theme-grid" role="radiogroup" aria-label="Theme">
-        <button type="button" class="th-tile" data-theme-pick="navy" role="radio" aria-checked="false"><span class="th-prev" style="background:#070d1a"><i style="background:#111b30"></i><i style="background:#5b9bff"></i><i style="background:#5b9bff;opacity:.45"></i></span><span class="th-tx"><b>Navy</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="graphite" role="radio" aria-checked="false"><span class="th-prev" style="background:#0b0e0d"><i style="background:#171c1a"></i><i style="background:#34d399"></i><i style="background:#34d399;opacity:.45"></i></span><span class="th-tx"><b>Graphite</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="purple" role="radio" aria-checked="false"><span class="th-prev" style="background:#0c0717"><i style="background:#1a1030"></i><i style="background:#b197fc"></i><i style="background:#b197fc;opacity:.45"></i></span><span class="th-tx"><b>Purple</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="ember" role="radio" aria-checked="false"><span class="th-prev" style="background:#080605"><i style="background:#1a1511"></i><i style="background:#ff8a3d"></i><i style="background:#ff8a3d;opacity:.45"></i></span><span class="th-tx"><b>Ember</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="light" role="radio" aria-checked="false"><span class="th-prev" style="background:#f2f5fa"><i style="background:#ffffff"></i><i style="background:#1d4ed8"></i><i style="background:#1d4ed8;opacity:.45"></i></span><span class="th-tx"><b>Light</b></span></button>
-        <button type="button" class="th-tile" data-theme-pick="classic" role="radio" aria-checked="false"><span class="th-prev" style="background:#030404"><i style="background:#17191e"></i><i style="background:#2fbf71"></i><i style="background:#2fbf71;opacity:.45"></i></span><span class="th-tx"><b>Classic</b></span></button>
+        <button type="button" class="th-tile" data-theme-pick="navy" role="radio" aria-checked="false" aria-label="Navy"><span class="th-prev" style="background:#070d1a"><i style="background:#5b9bff"></i></span><span class="th-tx"><b>Navy</b></span></button>
+        <button type="button" class="th-tile" data-theme-pick="graphite" role="radio" aria-checked="false" aria-label="Graphite"><span class="th-prev" style="background:#0b0e0d"><i style="background:#34d399"></i></span><span class="th-tx"><b>Graph</b></span></button>
+        <button type="button" class="th-tile" data-theme-pick="purple" role="radio" aria-checked="false" aria-label="Purple"><span class="th-prev" style="background:#0c0717"><i style="background:#b197fc"></i></span><span class="th-tx"><b>Purple</b></span></button>
+        <button type="button" class="th-tile" data-theme-pick="ember" role="radio" aria-checked="false" aria-label="Ember"><span class="th-prev" style="background:#080605"><i style="background:#ff8a3d"></i></span><span class="th-tx"><b>Ember</b></span></button>
+        <button type="button" class="th-tile" data-theme-pick="light" role="radio" aria-checked="false" aria-label="Light"><span class="th-prev" style="background:#f2f5fa"><i style="background:#1d4ed8"></i></span><span class="th-tx"><b>Light</b></span></button>
+        <button type="button" class="th-tile" data-theme-pick="classic" role="radio" aria-checked="false" aria-label="Classic"><span class="th-prev" style="background:#030404"><i style="background:#2fbf71"></i></span><span class="th-tx"><b>Classic</b></span></button>
       </div>
       <div class="ap-block">
         <p class="ap-label">Look</p>
@@ -734,10 +734,10 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script src="./js/config.js?v=20261106010138"></script>
-<script src="./js/orbit.js?v=20261106010138"></script>
-<script src="./js/classify.js?v=20261106010138"></script>
-<script src="./js/scanner.js?v=20261106010138"></script>
-<script src="./js/app.js?v=20261106010138"></script>
+<script src="./js/config.js?v=20261106010304"></script>
+<script src="./js/orbit.js?v=20261106010304"></script>
+<script src="./js/classify.js?v=20261106010304"></script>
+<script src="./js/scanner.js?v=20261106010304"></script>
+<script src="./js/app.js?v=20261106010304"></script>
 </body>
 </html>
